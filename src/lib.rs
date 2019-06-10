@@ -32,11 +32,12 @@ pub struct Locus {
 #[derive(Debug)]
 pub enum Command {
     Version,
-    ShellCompletions(String),
+    Completions(String),
     MakeTime(Name),
     MakePlace(Name),
     GotoPlace(Name),
     ReadLine,
+    SdlTest,
     Bitmap(bitmap::Command),
 }
 
