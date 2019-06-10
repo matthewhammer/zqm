@@ -1,0 +1,14 @@
+[package]
+name = "zoom-quilt-maker"
+version = "0.1.0"
+authors = ["Matthew A Hammer <pubmah@nym.hush.com>"]
+
+[dependencies]
+clap = "2.0"
+structopt = "0.2"
+log = "0.4"
+env_logger = "0.6"
+
+[[bin]]
+name = "zqm"
+path = "src/bin/zqm.rs"
