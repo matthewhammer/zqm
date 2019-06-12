@@ -26,15 +26,6 @@ use zoom_quilt_maker::{
     Name, Command, Dir2D
 };
 
-fn init_log(verbose:bool) {
-    use log::LevelFilter;
-    use env_logger::{Builder, WriteStyle};
-    let mut builder = Builder::new();
-    builder.filter(None, if verbose { LevelFilter::Trace } else { LevelFilter::Debug })
-        .write_style(WriteStyle::Always)
-        .init();
-}
-
 /// zoom-quilt-maker
 #[derive(StructOpt, Debug)]
 #[structopt(name="zqm",raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
@@ -67,10 +58,6 @@ enum CliCommand {
     #[structopt(name  = "read-line",
                 about = "Read a line of text from stdin; archive it.")]
     ReadLine,
-
-    #[structopt(name  = "sdl-test",
-                about = "Test SDL library.")]
-    SdlTest,
 
     #[structopt(name  = "goto-place",
                 about = "Go to an existing, previously-named place.")]
@@ -169,7 +156,6 @@ fn translate_command(clicmd:&CliCommand) -> Command {
         CliCommand::Version => Command::Version,
         CliCommand::Completions{shell:s} => Command::Completions(s.to_string()),
         CliCommand::ReadLine => Command::ReadLine,
-        CliCommand::SdlTest => Command::SdlTest,
         CliCommand::MakeTime{name:n} => Command::MakeTime(translate_time_name(&n)),
         CliCommand::MakePlace{name:n} => Command::MakePlace(translate_place_name(&n)),
         CliCommand::GotoPlace{name:n} => Command::GotoPlace(n.to_string()),
@@ -182,124 +168,77 @@ fn translate_command(clicmd:&CliCommand) -> Command {
                 &CliDir2D::Left  => Dir2D::Left,
                 &CliDir2D::Right => Dir2D::Right,
             };
-            Command::Bitmap(bitmap::Command::Edit(bitmap::EditCommand::Move(dir)))
+            Command::Bitmap(bitmap::Command::Edit(bitmap::EditCommand::MoveRel(dir)))
         }
         //_ => unimplemented!("translate_command({:?})", clicmd),
     }
 }
 
 
-pub fn sdl_event_loop() -> Result<(), String> {
-    use sdl2::rect::{Rect};
-    use sdl2::pixels::Color;
+fn init_log(verbose:bool) {
+    use log::LevelFilter;
+    use env_logger::{Builder, WriteStyle};
+    let mut builder = Builder::new();
+    builder.filter(None,
+                   if verbose {
+                       LevelFilter::Trace
+                   }
+                   else {
+                       LevelFilter::Debug
+                   })
+        .write_style(WriteStyle::Always)
+        .init();
+}
+
+
+pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
     use sdl2::event::Event;
-    //use sdl2::mouse::MouseButton;
     use sdl2::keyboard::Keycode;
-    //use sdl2::video::{Window, WindowContext};
-    //use sdl2::render::{Canvas, Texture, TextureCreator};
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
-
-    // the window is the representation of a window in your operating system,
-    // however you can only manipulate properties of that window, like its size, whether it's
-    // fullscreen, ... but you cannot change its content without using a Canvas or using the
-    // `surface()` method.
-    let zoom = 32u32;
-    let width = 8u32;
-    let height = 8u32;
+    let zoom = 64u32;
     let window = video_subsystem
-        .window("zoom-quilt-maker",
+        .window("zoom-quilt-make::bitmap",
                 8 * zoom + 1,
                 8 * zoom + 1)
         .position_centered()
-        //.fullscreen()
-        //.fullscreen_desktop()
+    //.fullscreen()
+    //.fullscreen_desktop()
         .build()
         .map_err(|e| e.to_string())?;
 
-    // the canvas allows us to both manipulate the property of the window and to change its content
-    // via hardware or software rendering. See CanvasBuilder for more info.
     let mut canvas = window.into_canvas()
         .target_texture()
         .present_vsync()
         .build()
         .map_err(|e| e.to_string())?;
-
-    println!("Using SDL_Renderer \"{}\"", canvas.info().name);
-
-    // grid border is a single background rect:
-    canvas.set_draw_color(Color::RGB(255, 255, 255));
-    canvas.fill_rect(
-        Rect::new(
-            0,
-            0,
-            width * zoom + 1,
-            height * zoom + 1,
-        )
-    )?;
-
-    // grid cells are rects:
-    canvas.set_draw_color(Color::RGB(0, 0, 0));
-    for x in 0i32..width as i32 {
-        for y in 0i32..height as i32 {
-            if y & 5 == 0 && x % 3 == 0 ||
-                x % 2 == 0 && y % 3 == 0
-            {
-                canvas.draw_rect(
-                    Rect::new(
-                        x * zoom as i32 + 2,
-                        y * zoom as i32 + 2,
-                        zoom            - 4,
-                        zoom            - 4,
-                    )
-                )?;
-            } else {
-                canvas.fill_rect(
-                    Rect::new(
-                        x * zoom as i32 + 2,
-                        y * zoom as i32 + 2,
-                        zoom            - 4,
-                        zoom            - 4,
-                    )
-                )?;
-            }
-        }
-    }
-    canvas.present();
+    info!("Using SDL_Renderer \"{}\"", canvas.info().name);
 
     let mut event_pump = sdl_context.event_pump()?;
     'running: loop {
-        // get the inputs here
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit {..}
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape), ..
-                } => {
-                    break 'running
-                },
-                Event::KeyDown {
-                    keycode: kc,
-                    repeat: false, ..
-                } => {
-                    debug!("KeyDown: {:?}", kc)
-                },
-                Event::MouseButtonDown {
-                    x, y,
-                    mouse_btn: b,
-                    ..
-                } => {
-                    debug!("MouseButtonDown: {:?} {:?} {:?}", x, y, b)
-                },
-                _ => {}
+        let mut do_draw = true;
+        let event = event_pump.wait_event();
+        match bitmap::io::consume_input(event) {
+            Ok(commands) => {
+                for c in commands.iter() {
+                    bitmap::semantics::editor_eval(
+                        editor, &bitmap::Command::Edit(c.clone())
+                    );
+                };
+                match editor.state {
+                    None => (),
+                    Some(ref st) =>
+                        bitmap::io::produce_output(&mut canvas, st)?
+                }
+            }
+            Err(()) => {
+                break 'running
             }
         }
-    }
-
+    };
     Ok(())
 }
-
 
 fn main() {
     let cliopt  = CliOpt::from_args();
@@ -323,16 +262,27 @@ fn main() {
             CliOpt::clap().gen_completions_to("zqm", s, &mut io::stdout());
             info!("done")
         }
-        CliCommand::SdlTest => {
-            sdl_event_loop().unwrap();
+        CliCommand::BitmapMake8x8 => {
+            // todo: cli flag for interactive vs non-interactive modes
+            if true {
+                bitmap::semantics::editor_eval(
+                    &mut state.bitmap_editor,
+                    &bitmap::Command::Init(
+                        bitmap::InitCommand::Make8x8
+                    )
+                );
+                sdl2_bitmap_editor(&mut state.bitmap_editor).unwrap();
+                info!("to do: bitmap edit history saved at {:?}", state.locus);
+            } else {
+                eval::eval(&mut state, &command)
+            }
         }
-        CliCommand::MakeTime{..}    => { eval::eval(&mut state, &command) }
-        CliCommand::MakePlace{..}   => { eval::eval(&mut state, &command) }
-        CliCommand::GotoPlace{..}   => { eval::eval(&mut state, &command) }
-        CliCommand::BitmapMake8x8   => { eval::eval(&mut state, &command) }
-        CliCommand::BitmapToggle    => { eval::eval(&mut state, &command) }
-        CliCommand::BitmapMove{..}  => { eval::eval(&mut state, &command) }
-        CliCommand::ReadLine        => {
+        CliCommand::MakeTime{..}      => { eval::eval(&mut state, &command) }
+        CliCommand::MakePlace{..}     => { eval::eval(&mut state, &command) }
+        CliCommand::GotoPlace{..}     => { eval::eval(&mut state, &command) }
+        CliCommand::BitmapToggle      => { eval::eval(&mut state, &command) }
+        CliCommand::BitmapMove{..}    => { eval::eval(&mut state, &command) }
+        CliCommand::ReadLine          => {
             let mut input = String::new();
             debug!("reading a line from stdin to store at {:?}", state.locus);
             match io::stdin().read_line(&mut input) {
