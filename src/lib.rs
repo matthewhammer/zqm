@@ -44,7 +44,6 @@ pub enum Command {
     MakePlace(Name),
     GotoPlace(Name),
     ReadLine,
-    SdlTest,
     Bitmap(bitmap::Command),
 }
 
@@ -59,7 +58,6 @@ pub enum Dir2D {
 pub mod eval {
     // Serde: Persistent state between invocations of ZQM
     use serde::{Deserialize, Serialize};
-
     use super::{
         //Name,
         NameFn,
@@ -104,11 +102,55 @@ pub mod eval {
         state_init
     }
 
-    pub fn eval(state: &mut State, command:&Command) {
-        debug!("begin: eval({:?}, {:?})", state, command);
-        unimplemented!()
+    pub fn eval(state: &mut State, command:&Command) -> Result<(), String> {
+        match command {
+            &Command::Version => Err("invalid command".to_string()),
+            &Command::Completions(_) => Err("invalid command".to_string()),
+            &Command::MakeTime(_) => unimplemented!(),
+            &Command::MakePlace(_) => unimplemented!(),
+            &Command::GotoPlace(_) => unimplemented!(),
+            &Command::ReadLine => unimplemented!(),
+            &Command::Bitmap(ref bc) => {
+                super::bitmap::semantics::editor_eval(&mut state.bitmap_editor, bc)
+            }
+        }
+
     }
 
+    // ideally, this "string" should have a type refinement giving the
+    // path abstractly as a name set, a la Fungi-Lang.
+    pub fn get_persis_state_path() -> String {
+        let dir : String =
+            std::env::current_dir().unwrap().to_str().unwrap().into();
+        format!("{}/zqm.json", dir)
+    }
+
+    use std::fs::{File, OpenOptions};
+    use std::io::{BufReader, ErrorKind, Write};
+
+    pub fn load_state() -> State {
+        let file = match File::open(&get_persis_state_path()) {
+            Ok(f) => f,
+            Err(error) => match error.kind() {
+                ErrorKind::NotFound => return init(),
+                _ => unreachable!(),
+            },
+        };
+        let reader = BufReader::new(file);
+        serde_json::from_reader(reader).unwrap()
+    }
+
+    pub fn save_state(state: &State) -> () {
+        let path = get_persis_state_path();
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .unwrap();
+        let output: String = serde_json::to_string_pretty(&state).unwrap();
+        file.write_all(output.as_bytes()).unwrap();
+    }
 }
 
 
@@ -209,6 +251,10 @@ pub mod bitmap {
         /// commands that advance the editor state,
         /// and possibly, its associated bitmap state
         Edit(EditCommand),
+
+        /// User requests an interactive editor from which to issue
+        /// further commands
+        Editor,
     }
 
     pub mod io {
@@ -420,6 +466,13 @@ pub mod bitmap {
                     match editor.state {
                         None => Err("Invalid editor state".to_string()),
                         Some(ref mut st) => editor_state_eval(st, &command),
+                    }
+                }
+                &Command::Editor => {
+                    // Test if the editor state is initialized; Err if not; Ok if so.
+                    match editor.state {
+                        None => Err("Invalid editor state".to_string()),
+                        Some(ref mut _st) => Ok(()),
                     }
                 }
             }

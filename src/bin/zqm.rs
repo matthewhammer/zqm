@@ -65,6 +65,10 @@ enum CliCommand {
         name: String
     },
 
+    #[structopt(name  = "bitmap-editor",
+                about = "Resume editing a bitmap.")]
+    BitmapEditor,
+
     #[structopt(name  = "bitmap-make-8x8",
                 about = "Make a new monochrome 8x8 bitmap.")]
     BitmapMake8x8,
@@ -159,8 +163,9 @@ fn translate_command(clicmd:&CliCommand) -> Command {
         CliCommand::MakeTime{name:n} => Command::MakeTime(translate_time_name(&n)),
         CliCommand::MakePlace{name:n} => Command::MakePlace(translate_place_name(&n)),
         CliCommand::GotoPlace{name:n} => Command::GotoPlace(n.to_string()),
+        CliCommand::BitmapEditor  => Command::Bitmap(bitmap::Command::Editor),
         CliCommand::BitmapMake8x8 => Command::Bitmap(bitmap::Command::Init(bitmap::InitCommand::Make8x8)),
-        CliCommand::BitmapToggle => Command::Bitmap(bitmap::Command::Edit(bitmap::EditCommand::Toggle)),
+        CliCommand::BitmapToggle  => Command::Bitmap(bitmap::Command::Edit(bitmap::EditCommand::Toggle)),
         CliCommand::BitmapMove{dir:ref d} => {
             let dir = match d {
                 &CliDir2D::Up    => Dir2D::Up,
@@ -243,7 +248,7 @@ fn main() {
     let cliopt  = CliOpt::from_args();
     init_log(cliopt.verbose);
 
-    let mut state = eval::init();
+    let mut state = eval::load_state();
 
     info!("command := translate({:?})", &cliopt.command);
     let command = translate_command(&cliopt.command);
@@ -261,26 +266,31 @@ fn main() {
             CliOpt::clap().gen_completions_to("zqm", s, &mut io::stdout());
             info!("done")
         }
-        CliCommand::BitmapMake8x8 => {
-            // todo: cli flag for interactive vs non-interactive modes
-            if true {
-                bitmap::semantics::editor_eval(
-                    &mut state.bitmap_editor,
-                    &bitmap::Command::Init(
-                        bitmap::InitCommand::Make8x8
-                    )
-                ).unwrap();
-                sdl2_bitmap_editor(&mut state.bitmap_editor).unwrap();
-                info!("to do: bitmap edit history saved at {:?}", state.locus);
-            } else {
-                eval::eval(&mut state, &command)
+        CliCommand::BitmapEditor => {
+            match eval::eval(&mut state, &command) {
+                Ok(()) => {
+                    sdl2_bitmap_editor(&mut state.bitmap_editor).unwrap();
+                    info!("to do: bitmap edit history saved at {:?}", state.locus);
+                },
+                Err(err) => {
+                    warn!("no existing bitmap; creating an empty one...");
+                    bitmap::semantics::editor_eval(
+                        &mut state.bitmap_editor,
+                        &bitmap::Command::Init(
+                            bitmap::InitCommand::Make8x8
+                        )
+                    ).unwrap();
+                    sdl2_bitmap_editor(&mut state.bitmap_editor).unwrap();
+                    info!("to do: bitmap edit history saved at {:?}", state.locus);
+                }
             }
-        }
-        CliCommand::MakeTime{..}      => { eval::eval(&mut state, &command) }
-        CliCommand::MakePlace{..}     => { eval::eval(&mut state, &command) }
-        CliCommand::GotoPlace{..}     => { eval::eval(&mut state, &command) }
-        CliCommand::BitmapToggle      => { eval::eval(&mut state, &command) }
-        CliCommand::BitmapMove{..}    => { eval::eval(&mut state, &command) }
+        },
+        CliCommand::BitmapMake8x8     => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::MakeTime{..}      => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::MakePlace{..}     => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::GotoPlace{..}     => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::BitmapToggle      => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::BitmapMove{..}    => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::ReadLine          => {
             let mut input = String::new();
             debug!("reading a line from stdin to store at {:?}", state.locus);
@@ -293,4 +303,5 @@ fn main() {
             }
         }
     }
+    eval::save_state(&state);
 }
