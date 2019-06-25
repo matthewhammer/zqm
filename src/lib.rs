@@ -1,38 +1,42 @@
-#![feature(nll)]
-
 #[macro_use] extern crate log;
+
+extern crate serde;
+extern crate serde_bytes;
 
 // SDL: Keyboard/mouse input events, multi-media output abstractions:
 extern crate sdl2;
+
+// Serde: Persistent state between invocations of ZQM
+use serde::{Deserialize, Serialize};
 
 pub type Nat = usize;
 
 pub type Name = String; // to do
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NameFn {  // to do
     pub path: Vec<Name>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Point {
     pub time:  Name,
     pub place: Name,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Space {
     pub time:  NameFn,
     pub place: NameFn,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Locus {
     pub point: Point,
     pub space: Space,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Command {
     Version,
     Completions(String),
@@ -44,7 +48,7 @@ pub enum Command {
     Bitmap(bitmap::Command),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Dir2D {
     Up,
     Down,
@@ -53,6 +57,9 @@ pub enum Dir2D {
 }
 
 pub mod eval {
+    // Serde: Persistent state between invocations of ZQM
+    use serde::{Deserialize, Serialize};
+
     use super::{
         //Name,
         NameFn,
@@ -63,7 +70,7 @@ pub mod eval {
         //Dir2D
     };
 
-    #[derive(Debug)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct State {
         pub locus: Locus,
         pub command_history: Vec<Command>,
@@ -107,10 +114,13 @@ pub mod eval {
 
 /// primitive visual images which each consist of a 2D grid of bits
 pub mod bitmap {
+    // Serde: Persistent state between invocations of ZQM
+    use serde::{Deserialize, Serialize};
+
     use super::{Nat, Dir2D};
 
     /// a grid of bits, represented as a 2D array
-    #[derive(Debug)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct Bitmap {
         pub width: Nat,
         pub height: Nat,
@@ -119,7 +129,7 @@ pub mod bitmap {
     }
 
     /// row-versus-column major order for grid representation
-    #[derive(Debug)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub enum Major {
         /// row major ordering (rows indexed first, then columns)
         Row,
@@ -130,7 +140,7 @@ pub mod bitmap {
 
     /// commands that advance the state of the bitmap,
     /// whose execution is independent of editor state
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum AutoCommand {
         /// toggle the bit at the given coordinate
         ToggleBit(Nat, Nat),
@@ -140,7 +150,7 @@ pub mod bitmap {
     }
 
     /// the (history-independent) state of the editor
-    #[derive(Debug)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct EditorState {
         /// created by an Init command; affected by Auto and Edit commands
         pub bitmap: Bitmap,
@@ -150,7 +160,7 @@ pub mod bitmap {
     }
 
     /// the full (history-dependent) state of the editor
-    #[derive(Debug)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct Editor {
         /// full linear history of this bitmap's evolution, as a sequence of commands
         pub history: Vec<Command>,
@@ -160,7 +170,7 @@ pub mod bitmap {
     }
 
     /// commands that create new bitmaps
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum InitCommand {
         /// make a new 8x8 grid of bits
         Make8x8,
@@ -174,7 +184,7 @@ pub mod bitmap {
 
     /// commands that advance the editor state,
     /// and possibly, its associated bitmap state.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum EditCommand {
         /// move the grid cursor one unit in a relative direction
         MoveRel(Dir2D),
@@ -187,7 +197,7 @@ pub mod bitmap {
     }
 
     /// commands that advance the evolution of a bitmap
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Command {
         /// commands that create new bitmaps
         Init(InitCommand),
@@ -340,7 +350,7 @@ pub mod bitmap {
             !b
         }
 
-        pub fn bitmap_eval(bitmap:&mut Bitmap, command:&AutoCommand) -> Result<(),()> {
+        pub fn bitmap_eval(bitmap:&mut Bitmap, command:&AutoCommand) -> Result<(), String> {
             debug!("bitmap_eval: {:?}", command);
             match command {
                 &AutoCommand::ToggleBit(x, y) => { bitmap_toggle_bit(bitmap, x, y); },
@@ -350,7 +360,7 @@ pub mod bitmap {
         }
 
         pub fn editor_state_eval(editor:&mut EditorState,
-                                 command:&EditCommand) -> Result<(),()>
+                                 command:&EditCommand) -> Result<(), String>
         {
             debug!("editor_state_eval: {:?}", command);
             match command {
@@ -372,7 +382,7 @@ pub mod bitmap {
                             Ok(())
                         }
                     else {
-                        Err(())
+                        Err("MoveAbs: invalid coordinate".to_string())
                     }
                 }
                 &EditCommand::Toggle => {
@@ -383,7 +393,7 @@ pub mod bitmap {
             }
         }
 
-        pub fn editor_eval(editor:&mut Editor, command:&Command) -> Result<(),()> {
+        pub fn editor_eval(editor:&mut Editor, command:&Command) -> Result<(), String> {
             debug!("editor_eval(#{}): {:?}", editor.history.len(), command);
             // save the command in the history
             editor.history.push( command.clone() );
@@ -402,13 +412,13 @@ pub mod bitmap {
                 }
                 &Command::Auto(ref command) => {
                     match editor.state {
-                        None => Err(()),
+                        None => Err("Invalid editor state".to_string()),
                         Some(ref mut st) => bitmap_eval(&mut st.bitmap, &command),
                     }
                 }
                 &Command::Edit(ref command) => {
                     match editor.state {
-                        None => Err(()),
+                        None => Err("Invalid editor state".to_string()),
                         Some(ref mut st) => editor_state_eval(st, &command),
                     }
                 }

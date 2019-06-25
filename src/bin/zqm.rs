@@ -1,11 +1,11 @@
-#![feature(nll)] // Rust non-lexical lifetimes
-
 // SDL: Keyboard/mouse input events, multi-media output abstractions:
 extern crate sdl2;
 
 // Logging:
 #[macro_use] extern crate log;
 extern crate env_logger;
+
+extern crate serde;
 
 // CLI: Representation and processing:
 extern crate clap;
@@ -192,8 +192,8 @@ fn init_log(verbose:bool) {
 
 
 pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
-    use sdl2::event::Event;
-    use sdl2::keyboard::Keycode;
+    //use sdl2::event::Event;
+    //use sdl2::keyboard::Keycode;
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
@@ -217,14 +217,13 @@ pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
 
     let mut event_pump = sdl_context.event_pump()?;
     'running: loop {
-        let mut do_draw = true;
         let event = event_pump.wait_event();
         match bitmap::io::consume_input(event) {
             Ok(commands) => {
                 for c in commands.iter() {
                     bitmap::semantics::editor_eval(
                         editor, &bitmap::Command::Edit(c.clone())
-                    );
+                    )?;
                 };
                 match editor.state {
                     None => (),
@@ -270,7 +269,7 @@ fn main() {
                     &bitmap::Command::Init(
                         bitmap::InitCommand::Make8x8
                     )
-                );
+                ).unwrap();
                 sdl2_bitmap_editor(&mut state.bitmap_editor).unwrap();
                 info!("to do: bitmap edit history saved at {:?}", state.locus);
             } else {
