@@ -272,7 +272,7 @@ fn main() {
                     sdl2_bitmap_editor(&mut state.bitmap_editor).unwrap();
                     info!("to do: bitmap edit history saved at {:?}", state.locus);
                 },
-                Err(err) => {
+                Err(_err) => {
                     warn!("no existing bitmap; creating an empty one...");
                     bitmap::semantics::editor_eval(
                         &mut state.bitmap_editor,
