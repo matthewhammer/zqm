@@ -172,6 +172,9 @@ fn translate_command(clicmd:&CliCommand) -> Command {
         CliCommand::Save    => Command::Save,
         CliCommand::Restore => Command::Restore,
 
+        CliCommand::Undo    => Command::Undo,
+        CliCommand::Redo    => Command::Redo,
+
         CliCommand::MakeTime{name:n}  => Command::MakeTime(translate_time_name(&n)),
         CliCommand::MakePlace{name:n} => Command::MakePlace(translate_place_name(&n)),
         CliCommand::GotoPlace{name:n} => Command::GotoPlace(n.to_string()),

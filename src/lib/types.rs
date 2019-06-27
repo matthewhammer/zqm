@@ -44,10 +44,18 @@ pub enum Command {
     MakeTime(Name),
     MakePlace(Name),
     GotoPlace(Name),
-    
+
     Bitmap(super::bitmap::Command),
+
+    // save/restore manages editor state via an ambient stack of past states
     Save,
     Restore,
+
+    // undo/redo manages editor states via an ambient tree of past commands, and associated states.
+    Undo,
+    Redo,
+
+    // how do save/restore and undo/redo interact?
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,6 +73,13 @@ pub mod command_history {
 
     pub type Commands = Vec<Command>;
 
+    /// A History organizes related command sequences over time.
+    ///
+    /// Fork is most general, then Linear, and finally, there's Empty.
+    ///
+    /// A fork can be introduced in two ways:
+    ///  - Undo + Redo
+    ///  -
     pub enum History {
         Empty,
         Linear(Commands),
