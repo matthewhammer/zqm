@@ -2,11 +2,11 @@
 use serde::{Deserialize, Serialize};
 use super::{
     //Name,
-    NameFn,
-    Point,
-    Space,
-    Locus,
-    Command,
+    types::{NameFn,
+            Point,
+            Space,
+            Locus,
+            Command}
     //Dir2D
 };
 
@@ -46,12 +46,12 @@ pub fn init() -> State {
 
 pub fn eval(state: &mut State, command:&Command) -> Result<(), String> {
     match command {
-        &Command::Version => Err("invalid command".to_string()),
-        &Command::Completions(_) => Err("invalid command".to_string()),
+        &Command::CliCommand(ref _cc) => Err("invalid command".to_string()),
         &Command::MakeTime(_) => unimplemented!(),
         &Command::MakePlace(_) => unimplemented!(),
         &Command::GotoPlace(_) => unimplemented!(),
-        &Command::ReadLine => unimplemented!(),
+        &Command::Save         => unimplemented!(),
+        &Command::Restore      => unimplemented!(),
         &Command::Bitmap(ref bc) => {
             super::bitmap::semantics::editor_eval(&mut state.bitmap_editor, bc)
         }

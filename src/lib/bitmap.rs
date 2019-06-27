@@ -1,7 +1,7 @@
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
 
-use super::{Nat, Dir2D};
+use types::{Nat, Dir2D};
 
 /// a grid of bits, represented as a 2D array
 #[derive(Debug, Serialize, Deserialize)]

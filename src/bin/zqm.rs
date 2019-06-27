@@ -22,8 +22,8 @@ use std::io;
 // ZQM:
 extern crate zoom_quilt_maker;
 use zoom_quilt_maker::{
+    types::{Name, Command, Dir2D, CliCommand as CliCmd},
     eval, bitmap,
-    Name, Command, Dir2D
 };
 
 /// zoom-quilt-maker
@@ -39,6 +39,14 @@ struct CliOpt {
 
 #[derive(StructOpt, Debug)]
 enum CliCommand {
+    #[structopt(name  = "save",
+                about = "Save the current editor state (push state stack).")]
+    Save,
+
+    #[structopt(name  = "restore",
+                about = "Restore an earlier editor state (pop state stack).")]
+    Restore,
+
     #[structopt(name  = "make-time",
                 about = "Give a meaningful name for a fresh time.")]
     #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
@@ -157,12 +165,17 @@ fn translate_place_name(cli_place_name:&CliPlaceName) -> Name {
 // translate CLI commands into the forms that we archive
 fn translate_command(clicmd:&CliCommand) -> Command {
     match clicmd.clone() {
-        CliCommand::Version => Command::Version,
-        CliCommand::Completions{shell:s} => Command::Completions(s.to_string()),
-        CliCommand::ReadLine => Command::ReadLine,
-        CliCommand::MakeTime{name:n} => Command::MakeTime(translate_time_name(&n)),
+        CliCommand::Version              => Command::CliCommand(CliCmd::Version),
+        CliCommand::Completions{shell:s} => Command::CliCommand(CliCmd::Completions(s.to_string())),
+        CliCommand::ReadLine             => Command::CliCommand(CliCmd::ReadLine),
+
+        CliCommand::Save    => Command::Save,
+        CliCommand::Restore => Command::Restore,
+
+        CliCommand::MakeTime{name:n}  => Command::MakeTime(translate_time_name(&n)),
         CliCommand::MakePlace{name:n} => Command::MakePlace(translate_place_name(&n)),
         CliCommand::GotoPlace{name:n} => Command::GotoPlace(n.to_string()),
+
         CliCommand::BitmapEditor  => Command::Bitmap(bitmap::Command::Editor),
         CliCommand::BitmapMake8x8 => Command::Bitmap(bitmap::Command::Init(bitmap::InitCommand::Make8x8)),
         CliCommand::BitmapToggle  => Command::Bitmap(bitmap::Command::Edit(bitmap::EditCommand::Toggle)),
@@ -285,6 +298,8 @@ fn main() {
                 }
             }
         },
+        CliCommand::Save              => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::Restore           => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::BitmapMake8x8     => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::MakeTime{..}      => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::MakePlace{..}     => { eval::eval(&mut state, &command).unwrap(); }
