@@ -52,6 +52,8 @@ pub fn eval(state: &mut State, command:&Command) -> Result<(), String> {
         &Command::GotoPlace(_) => unimplemented!(),
         &Command::Save         => unimplemented!(),
         &Command::Restore      => unimplemented!(),
+        &Command::Undo         => unimplemented!(),
+        &Command::Redo         => unimplemented!(),
         &Command::Bitmap(ref bc) => {
             super::bitmap::semantics::editor_eval(&mut state.bitmap_editor, bc)
         }

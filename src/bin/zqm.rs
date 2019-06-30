@@ -47,6 +47,14 @@ enum CliCommand {
                 about = "Restore an earlier editor state (pop state stack).")]
     Restore,
 
+    #[structopt(name  = "undo",
+                about = "Undo the last command, and revert current editor state.")]
+    Undo,
+
+    #[structopt(name  = "redo",
+                about = "Redo the last command, and revert the current editor state.")]
+    Redo,
+
     #[structopt(name  = "make-time",
                 about = "Give a meaningful name for a fresh time.")]
     #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
@@ -303,6 +311,8 @@ fn main() {
         },
         CliCommand::Save              => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::Restore           => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::Undo              => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::Redo              => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::BitmapMake8x8     => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::MakeTime{..}      => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::MakePlace{..}     => { eval::eval(&mut state, &command).unwrap(); }
