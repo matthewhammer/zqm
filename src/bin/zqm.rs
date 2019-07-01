@@ -15,6 +15,7 @@ extern crate structopt;
 use structopt::StructOpt;
 
 use std::io;
+use std::time::Duration;
 
 // Unix OS:
 //use std::process::Command as UnixCommand;
@@ -246,24 +247,28 @@ pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
 
     let mut event_pump = sdl_context.event_pump()?;
     'running: loop {
-        let event = event_pump.wait_event();
-        match bitmap::io::consume_input(event) {
-            Ok(commands) => {
-                for c in commands.iter() {
-                    bitmap::semantics::editor_eval(
-                        editor, &bitmap::Command::Edit(c.clone())
-                    )?;
-                };
-                match editor.state {
-                    None => (),
-                    Some(ref st) =>
-                        bitmap::io::produce_output(&mut canvas, st)?
+        //let event = event_pump.wait_event();
+        for event in event_pump.poll_iter() {
+            match bitmap::io::consume_input(event) {
+                Ok(commands) => {
+                    for c in commands.iter() {
+                        bitmap::semantics::editor_eval(
+                            editor, &bitmap::Command::Edit(c.clone())
+                        )?;
+                    };
+                    match editor.state {
+                        None => (),
+                        Some(ref st) =>
+                            bitmap::io::produce_output(&mut canvas, st)?
+                }
+                }
+                Err(()) => {
+                    break 'running
                 }
             }
-            Err(()) => {
-                break 'running
-            }
-        }
+        };
+        // delay the thread so we don't burn too much electricity
+        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / (60 * 20)));
     };
     Ok(())
 }

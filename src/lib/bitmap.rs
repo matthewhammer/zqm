@@ -140,48 +140,53 @@ pub mod io {
         let zoom = 64u32;
         let width = 8u32;
         let height = 8u32;
-        let border_width = 2u32;
+        let unset_cell = Color::RGB(255, 255, 255);
+        let padding_color = Color::RGB(255, 255, 255);
+        let border_color = Color::RGB(0, 0, 0);
+        let padding_width = 2u32;
+        let cursor_something = Color::RGB(150, 255, 150);
+        fn get_cell_color (is_set:bool, is_focus:bool) -> Color {
+            match (is_set, is_focus) {
+            | (false, false) => Color::RGB(255, 255, 255),
+            | (false, true)  => Color::RGB(240, 255, 240),
+            | (true,  false) => Color::RGB(0, 0, 0),
+            | (true,  true)  => Color::RGB(0, 100, 0),
+            }
+        };
 
         let cursor_rect = Rect::new(
-            edit_state.cursor.0 as i32 * zoom as i32 - border_width as i32,
-            edit_state.cursor.1 as i32 * zoom as i32 - border_width as i32,
-            zoom + border_width * 2,
-            zoom + border_width * 2,
+            edit_state.cursor.0 as i32 * zoom as i32 - padding_width as i32,
+            edit_state.cursor.1 as i32 * zoom as i32 - padding_width as i32,
+            zoom + padding_width * 2,
+            zoom + padding_width * 2,
         );
 
-        // grid border is a single background rect:
-        canvas.set_draw_color(Color::RGB(255, 255, 255));
+        // grid padding is a single background rect:
+        canvas.set_draw_color(padding_color);
         canvas.fill_rect(
             Rect::new(
                 0,
                 0,
-                width * zoom + border_width,
-                height * zoom + border_width,
+                width * zoom + padding_width,
+                height * zoom + padding_width,
             )
         )?;
-        canvas.set_draw_color(Color::RGB(150, 255, 150));
+        canvas.set_draw_color(cursor_something);
         canvas.fill_rect(cursor_rect)?;
         // grid cells are rects:
         for x in 0i32..width as i32 {
             for y in 0i32..height as i32 {
                 let cell_rect =
                     Rect::new(
-                        x * zoom as i32 + border_width as i32,
-                        y * zoom as i32 + border_width as i32,
-                        zoom            - border_width * 2,
-                        zoom            - border_width * 2,
+                        x * zoom as i32 + padding_width as i32,
+                        y * zoom as i32 + padding_width as i32,
+                        zoom            - padding_width * 2,
+                        zoom            - padding_width * 2,
                     );
                 let bit = super::semantics::bitmap_get_bit(
                     &edit_state.bitmap, x as usize, y as usize
                 );
-                let border_color = Color::RGB(0, 0, 0);
-                let cell_color =
-                    match (bit, (x as usize, y as usize) == edit_state.cursor) {
-                        | (false, false) => Color::RGB(255, 255, 255),
-                        | (false, true)  => Color::RGB(240, 255, 240),
-                        | (true,  false) => Color::RGB(0, 0, 0),
-                        | (true,  true)  => Color::RGB(0, 100, 0),
-                    };
+                let cell_color = get_cell_color(bit, (x as usize, y as usize) == edit_state.cursor);
                 canvas.set_draw_color(cell_color);
                 canvas.fill_rect(cell_rect)?;
                 canvas.set_draw_color(border_color);
