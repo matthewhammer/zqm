@@ -300,8 +300,10 @@ fn init_log(verbose:bool) {
 
 
 pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
-    //use sdl2::event::Event;
+    use sdl2::event::EventType;
     //use sdl2::keyboard::Keycode;
+
+
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
@@ -324,8 +326,13 @@ pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
     info!("Using SDL_Renderer \"{}\"", canvas.info().name);
 
     let mut event_pump = sdl_context.event_pump()?;
+    event_pump.disable_event(EventType::FingerUp);
+    event_pump.disable_event(EventType::FingerDown);
+    event_pump.disable_event(EventType::FingerMotion);
+    event_pump.disable_event(EventType::MouseMotion);
     'running: loop {
         let event = event_pump.wait_event();
+        debug!("{:?}", event);
         match bitmap::io::consume_input(event) {
             Ok(commands) => {
                 for c in commands.iter() {
