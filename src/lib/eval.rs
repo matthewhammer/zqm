@@ -1,41 +1,36 @@
-// Serde: Persistent state between invocations of ZQM
-use serde::{Deserialize, Serialize};
 use super::{
-    //Name,
-    types::{NameFn,
-            Point,
-            Space,
-            Locus,
-            Command}
-    //Dir2D
+    types::{Name,  NameFn,
+            Point, Space,
+            Locus, Command,
+            State,
+            util::{
+                name_of_str, 
+                namefn_id
+            }
+    }
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct State {
-    pub locus: Locus,
-    pub command_history: Vec<Command>,
-    pub bitmap_editor: super::bitmap::Editor,
-}
 
 // to do: take "genesis" arguments:
 // - user's self-symbol abbreviation
 // - current date, time, place, etc
 // - OS filesystem paths for archiving
-pub fn init() -> State {
-    let id_nmfn = NameFn{path:vec![]};
+pub fn init_state() -> State {
+    let here : Name   = name_of_str("here");
+    let now  : Name   = name_of_str("now");
+    let id   : NameFn = namefn_id();
+
     let locus_init = Locus{
         point: Point{
-            time:  "now".to_string(),
-            place: "here".to_string(),
+            place: here,
+            time:  now,
         },
         space: Space {
-            time:  id_nmfn.clone(),
-            place: id_nmfn,
+            place: id.clone(),
+            time:  id,
         },
     };
     let state_init = State {
         locus: locus_init,
-        command_history: vec![],
         bitmap_editor: super::bitmap::Editor {
             state: None,
             history: vec![],
@@ -48,10 +43,15 @@ pub fn eval(state: &mut State, command:&Command) -> Result<(), String> {
     match command {
         &Command::CliCommand(ref _cc) => Err("invalid command".to_string()),
         &Command::MakeTime(_) => unimplemented!(),
+        &Command::BeAtTime(_) => unimplemented!(),
+        &Command::BeginTime(_) => unimplemented!(),
+        &Command::EndTime      => unimplemented!(),
         &Command::MakePlace(_) => unimplemented!(),
-        &Command::GotoPlace(_) => unimplemented!(),
-        &Command::Save         => unimplemented!(),
-        &Command::Restore      => unimplemented!(),
+        &Command::GoToPlace(_) => unimplemented!(),
+        &Command::BeginPlace(_) => unimplemented!(),
+        &Command::EndPlace     => unimplemented!(),
+        &Command::Save(_)      => unimplemented!(),
+        &Command::Restore(_)   => unimplemented!(),
         &Command::Undo         => unimplemented!(),
         &Command::Redo         => unimplemented!(),
         &Command::Bitmap(ref bc) => {
@@ -76,7 +76,7 @@ pub fn load_state() -> State {
     let file = match File::open(&get_persis_state_path()) {
         Ok(f) => f,
         Err(error) => match error.kind() {
-            ErrorKind::NotFound => return init(),
+            ErrorKind::NotFound => return init_state(),
             _ => unreachable!(),
         },
     };

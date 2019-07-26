@@ -2,9 +2,30 @@
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
 
+pub type Hash = u64;
 pub type Nat = usize;
 
-pub type Name = String; // to do
+pub type Map<X,Y> = std::collections::HashMap<X,Y>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct Name {
+    pub tree: Box<NameTree>,
+    //pub hash: Hash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum NameTree {
+    Atom(NameAtom),
+    Option(Option<Name>),
+    TaggedTuple(Name, Vec<Name>)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum NameAtom {
+    Bool(bool),
+    Usize(usize),
+    String(String),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NameFn {  // to do
@@ -41,15 +62,22 @@ pub enum CliCommand {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Command {
     CliCommand(CliCommand),
+
     MakeTime(Name),
+    BeAtTime(Name),
+    BeginTime(Name),
+    EndTime,
+
     MakePlace(Name),
-    GotoPlace(Name),
+    GoToPlace(Name),
+    BeginPlace(Name),
+    EndPlace,
 
     Bitmap(super::bitmap::Command),
 
-    // save/restore manages editor state via an ambient stack of past states
-    Save,
-    Restore,
+    // save/restore manages editor state via an ambient store of named editor states
+    Save(Name),
+    Restore(Name),
 
     // undo/redo manages editor states via an ambient n-ary tree zipper of past commands,
     // and associated states (think "emacs undo tree").
@@ -73,7 +101,96 @@ pub enum Dir2D {
 }
 
 
-/// generalizes the relationship between:
+/// a state conists of a locus and a tuple of editor states, across the zqm modules.
+///
+/// the state tuple has an editor component per possible (concurrent, independent) editor type
+/// (but for now, we just edit bitmaps)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct State {
+    pub locus: Locus,
+    pub bitmap_editor: super::bitmap::Editor,
+}
+
+/// a state store maps state names to states
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StateStore( Map<Name, State> );
+
+/// a state store tree cursor
+///
+/// the "cursor position" is a distinct subtree;
+/// together with the tree context, the pair forms a "tree zipper"
+/// that represents a cursor in a tree, permitting O(1) local navigation.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StateStoreTreeCursor {
+    pub ctx: StateStoreTreeCtx,
+    pub pos: StateStoreTree,
+}
+
+/// historical tree of state stores
+///
+/// a state store tree organizes a set of meta commands' state stores into a
+/// historical tree of concurrent evolution; each "node" is a store of
+/// states; each "edge" is a MetaCommand that relates two nodes' state stores.
+#[derive(Debug, Serialize, Deserialize)]
+pub enum StateStoreTree {
+    Empty,
+    Singleton(StateStore),
+    Linear(StateStore, Vec<LinearStateTrans>, Box<StateStoreTree>),
+    Branching(StateStore, Vec<BranchingStateTrans>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum StateStoreTreeCtx {
+    Linear(StateStore, Vec<LinearStateTrans>, Vec<LinearStateTrans>),
+    Branching(StateStore, Vec<BranchingStateTransCtx>),
+}
+
+/// a linear state transition consists of a `Command` and target `StateStore`
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LinearStateTrans {
+    command: Command,
+    target: StateStore,
+}
+
+/// a branching state transition consists of a `Command` and target `StateStoreTree`
+///
+/// two sister state transitions, each of type `BranchingStateTrans`,
+/// arise together when a `Command` is undone, and a distinct `Command` is issued;
+/// this pattern can repeat, giving rise to more siblings.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BranchingStateTrans {
+    command: Command,
+    subtree: Box<StateStoreTree>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BranchingStateTransCtx {
+    ctx: StateStoreTreeCtx,
+    command: Command,
+}
+
+pub mod util {
+    use super::*;
+
+    pub fn namefn_id() -> NameFn {
+        NameFn{path:vec![]}
+    }
+
+    pub fn name_of_str(s:&str) -> Name {
+        let atom = NameAtom::String(s.to_string());
+        Name{tree:Box::new(NameTree::Atom(atom))}
+    }   
+
+    pub fn name_of_string(s:String) -> Name {
+        let atom = NameAtom::String(s);
+        Name{tree:Box::new(NameTree::Atom(atom))}
+    }   
+}
+        
+/*
+
+/// A `History` generalizes the relationship between interactive
+/// `Command`s and the `State`s that they describe and inter-relate.
 ///
 /// - Commands
 ///
@@ -87,10 +204,11 @@ pub enum Dir2D {
 /// states; undo/redo editor states, including the _mathematical_
 /// meaning of "undo/redo", which generalizes and nests.
 ///
+
 use std::hash::Hash;
 use std::fmt::Debug;
 
-trait CommandHistory : Eq + Hash + Debug {
+trait History : Eq + Hash + Debug {
     /// State of an abstracted "editor"
     type State    : Eq + Hash + Debug + Clone;
     /// Commands of an abstracted "editor"
@@ -117,7 +235,10 @@ trait CommandHistory : Eq + Hash + Debug {
     /// internal semantics of this command history.
     ///
     /// this method gives the "historical semantics" for the given "historical command"
-    fn intern_eval(&mut self, state:&mut Self::State, command:&Self::HCommand) -> Result<Self::Resp, Self::Error>;
+    fn intern_eval(&mut self,
+                   state: &mut Self::State,
+                   command: &Self::HCommand)
+                   -> Result<Self::Resp, Self::Error>;
 
     /// external semantics of this command history
     ///
@@ -131,42 +252,20 @@ trait CommandHistory : Eq + Hash + Debug {
     /// formed", where each "after" state becomes the "before" state
     /// in the subsequent triple, if any.
     ///
-    fn extern_triple(&mut self, before:&Self::State, command:&Self::Command, after:&Self::State);
+    fn extern_eval(&mut self,
+                   before: &Self::State,
+                   command: &Self::Command,
+                   result: Result<Self::Resp, Self::Error>,
+                   after: &Self::State);
 }
+*/
 
-/// store and explore a history of all issued commands
-pub mod command_history {
-    use std::rc::Rc;
-    use super::{Command, Nat};
+/////////////////////////////////
 
-    pub type Commands = Vec<Command>;
-
-    /// A History organizes related command sequences over time.
-    ///
-    /// Fork is most general, then Linear, and finally, there's Empty.
-    ///
-    /// A fork can be introduced in two ways:
-    ///  - Undo + Redo
-    ///  -
-    pub enum History {
-        Empty,
-        Linear(Commands),
-        Fork(Fork),
-    }
-
-    pub struct Fork {
-        pub shared_history: Rc<Commands>,
-        pub sub_histories: Vec<Rc<History>>,
-    }
-
-    pub enum Context {
-        Empty,
-        Linear(Rc<Context>, Commands),
-        Fork(Rc<Context>, Fork, Nat),
-    }
-
-    pub struct Cursor {
-        pub context: Context,
-        pub history: History,
+/*
+impl FromStr for Name {
+    fn from_str(s:& str) -> Name {
+        Name::Atom(NameAtom::String(s.to_string()))
     }
 }
+*/

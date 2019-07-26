@@ -33,7 +33,7 @@ pub enum AutoCommand {
     SetBit(Nat, Nat, bool),
 }
 
-/// the (history-independent) state of the editor
+/// the history-_independent_ state of the editor
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EditorState {
     /// created by an Init command; affected by Auto and Edit commands
@@ -43,7 +43,7 @@ pub struct EditorState {
     pub cursor: (Nat, Nat)
 }
 
-/// the full (history-dependent) state of the editor
+/// the history-_dependent_ state of the editor
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Editor {
     /// full linear history of this bitmap's evolution, as a sequence of commands
@@ -140,15 +140,14 @@ pub mod io {
         let zoom = 64u32;
         let width = 8u32;
         let height = 8u32;
-        let unset_cell = Color::RGB(255, 255, 255);
-        let padding_color = Color::RGB(255, 255, 255);
+        let padding_color = Color::RGB(200, 180, 200);
         let border_color = Color::RGB(0, 0, 0);
         let padding_width = 2u32;
         let cursor_something = Color::RGB(150, 255, 150);
         fn get_cell_color (is_set:bool, is_focus:bool) -> Color {
             match (is_set, is_focus) {
-            | (false, false) => Color::RGB(255, 255, 255),
-            | (false, true)  => Color::RGB(240, 255, 240),
+            | (false, false) => Color::RGB(255, 245, 255),
+            | (false, true)  => Color::RGB(240, 250, 240),
             | (true,  false) => Color::RGB(0, 0, 0),
             | (true,  true)  => Color::RGB(0, 100, 0),
             }
@@ -244,7 +243,7 @@ pub mod semantics {
     }
 
     pub fn bitmap_eval(bitmap:&mut Bitmap, command:&AutoCommand) -> Result<(), String> {
-        debug!("bitmap_eval: {:?}", command);
+        trace!("bitmap_eval: {:?}", command);
         match command {
             &AutoCommand::ToggleBit(x, y) => { bitmap_toggle_bit(bitmap, x, y); },
             &AutoCommand::SetBit(x, y, b) => { bitmap_set_bit(bitmap, x, y, b); },
@@ -255,7 +254,7 @@ pub mod semantics {
     pub fn editor_state_eval(editor:&mut EditorState,
                              command:&EditCommand) -> Result<(), String>
     {
-        debug!("editor_state_eval: {:?}", command);
+        trace!("editor_state_eval: {:?}", command);
         match command {
             &EditCommand::MoveRel(ref dir) => {
                 let (w, h) = (editor.bitmap.width, editor.bitmap.height);

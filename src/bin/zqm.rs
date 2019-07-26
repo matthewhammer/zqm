@@ -23,7 +23,7 @@ use std::time::Duration;
 // ZQM:
 extern crate zoom_quilt_maker;
 use zoom_quilt_maker::{
-    types::{Name, Command, Dir2D, CliCommand as CliCmd},
+    types::{Name, Command, Dir2D, CliCommand as CliCmd, util::{name_of_string}},
     eval, bitmap,
 };
 
@@ -39,14 +39,71 @@ struct CliOpt {
 }
 
 #[derive(StructOpt, Debug)]
+enum CliDir2D {
+    #[structopt(name = "up", about = "↑ Move up")]
+    Up,
+    #[structopt(name = "down", about = "↓ Move down")]
+    Down,
+    #[structopt(name = "left", about = "← Move left")]
+    Left,
+    #[structopt(name = "right", about = "→ Move right")]
+    Right
+}
+
+#[derive(StructOpt, Debug)]
+enum CliTimeName {
+    #[structopt(name  = "from-date",
+                about = "Determine the time name from the current date and time.")]
+    FromDate,
+
+    #[structopt(name  = "by-name",
+                about = "Give the time name explicitly as a string argument.")]
+    ByName{
+        name: String,
+    }
+}
+
+#[derive(StructOpt, Debug)]
+enum CliStoreName {
+    #[structopt(name  = "from-date",
+                about = "Determine the store name from the current date and time.")]
+    FromDate,
+
+    #[structopt(name  = "by-name",
+                about = "Give the store name explicitly as a string argument.")]
+    ByName{
+        name: String,
+    }
+}
+
+#[derive(StructOpt, Debug)]
+enum CliPlaceName {
+    #[structopt(name  = "from-wd",
+                about = "Determine the place name from the current working directory.")]
+    FromWd,
+
+    #[structopt(name  = "by-name",
+                about = "Give the place name explicitly as a string argument.")]
+    ByName{
+        name: String,
+    }
+}
+
+#[derive(StructOpt, Debug)]
 enum CliCommand {
     #[structopt(name  = "save",
                 about = "Save the current editor state (push state stack).")]
-    Save,
+    Save{
+        #[structopt(subcommand)]
+        name: CliStoreName
+    },
 
     #[structopt(name  = "restore",
                 about = "Restore an earlier editor state (pop state stack).")]
-    Restore,
+    Restore{
+        #[structopt(subcommand)]
+        name: CliStoreName
+    },
 
     #[structopt(name  = "undo",
                 about = "Undo the last command, and revert current editor state.")]
@@ -64,6 +121,35 @@ enum CliCommand {
         name: CliTimeName
     },
 
+    #[structopt(name  = "beat-time",
+                about = "(Same as be-at-time).")]
+    #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
+    BeatTime{
+        #[structopt(subcommand)]
+        name: CliTimeName
+    },
+
+    #[structopt(name  = "be-at-time",
+                about = "Use the given name for current moment.")]
+    #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
+    BeAtTime{
+        #[structopt(subcommand)]
+        name: CliTimeName
+    },
+
+    #[structopt(name  = "begin-time",
+                about = "Use the given name for a span of time.")]
+    #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
+    BeginTime{
+        #[structopt(subcommand)]
+        name: CliTimeName
+    },
+
+    #[structopt(name  = "end-time",
+                about = "End the last-begun span of time, in LIFO order.")]
+    #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
+    EndTime,
+
     #[structopt(name  = "make-place",
                 about = "Give a meaningful name for a fresh place.")]
     #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
@@ -72,15 +158,30 @@ enum CliCommand {
         name: CliPlaceName
     },
 
+    #[structopt(name  = "goto-place",
+                about = "Go to an existing, previously-named place.")]
+    #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
+    GoToPlace{
+        #[structopt(subcommand)]
+        name: CliPlaceName
+    },
+
+    #[structopt(name  = "begin-place",
+                about = "Use the given name for a region of space.")]
+    #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
+    BeginPlace{
+        #[structopt(subcommand)]
+        name: CliPlaceName
+    },
+
+    #[structopt(name  = "end-place",
+                about = "End the last-begun region of space, in LIFO order.")]
+    #[structopt(raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
+    EndPlace,
+
     #[structopt(name  = "read-line",
                 about = "Read a line of text from stdin; archive it.")]
     ReadLine,
-
-    #[structopt(name  = "goto-place",
-                about = "Go to an existing, previously-named place.")]
-    GotoPlace{
-        name: String
-    },
 
     #[structopt(name  = "bitmap-editor",
                 about = "Resume editing a bitmap.")]
@@ -115,47 +216,18 @@ enum CliCommand {
     },
 }
 
-#[derive(StructOpt, Debug)]
-enum CliDir2D {
-    #[structopt(name = "up", about = "↑ Move up")]
-    Up,
-    #[structopt(name = "down", about = "↓ Move down")]
-    Down,
-    #[structopt(name = "left", about = "← Move left")]
-    Left,
-    #[structopt(name = "right", about = "→ Move right")]
-    Right
-}
-
-#[derive(StructOpt, Debug)]
-enum CliTimeName {
-    #[structopt(name  = "from-date",
-                about = "Determine the time name from the current date and time.")]
-    FromDate,
-
-    #[structopt(name  = "by-name",
-                about = "Give the time name explicitly as a string argument.")]
-    ByName{
-        name: String,
-    }
-}
-
-#[derive(StructOpt, Debug)]
-enum CliPlaceName {
-    #[structopt(name  = "from-wd",
-                about = "Determine the place name from the current working directory.")]
-    FromWd,
-
-    #[structopt(name  = "by-name",
-                about = "Give the place name explicitly as a string argument.")]
-    ByName{
-        name: String,
+fn translate_store_name(cli_store_name:&CliStoreName) -> Name {
+    match cli_store_name.clone() {
+        CliStoreName::ByName{name:n} => name_of_string(n.to_string()),
+        CliStoreName::FromDate => {
+            unimplemented!()
+        }
     }
 }
 
 fn translate_time_name(cli_time_name:&CliTimeName) -> Name {
     match cli_time_name.clone() {
-        CliTimeName::ByName{name:n} => n.to_string(),
+        CliTimeName::ByName{name:n} => name_of_string(n.to_string()),
         CliTimeName::FromDate => {
             unimplemented!()
         }
@@ -164,7 +236,7 @@ fn translate_time_name(cli_time_name:&CliTimeName) -> Name {
 
 fn translate_place_name(cli_place_name:&CliPlaceName) -> Name {
     match cli_place_name.clone() {
-        CliPlaceName::ByName{name:n} => n.to_string(),
+        CliPlaceName::ByName{name:n} => name_of_string(n.to_string()),
         CliPlaceName::FromWd => {
             unimplemented!()
         }
@@ -178,15 +250,22 @@ fn translate_command(clicmd:&CliCommand) -> Command {
         CliCommand::Completions{shell:s} => Command::CliCommand(CliCmd::Completions(s.to_string())),
         CliCommand::ReadLine             => Command::CliCommand(CliCmd::ReadLine),
 
-        CliCommand::Save    => Command::Save,
-        CliCommand::Restore => Command::Restore,
+        CliCommand::Save{name:n}    => Command::Save(translate_store_name(&n)),
+        CliCommand::Restore{name:n} => Command::Restore(translate_store_name(&n)),
 
         CliCommand::Undo    => Command::Undo,
         CliCommand::Redo    => Command::Redo,
 
         CliCommand::MakeTime{name:n}  => Command::MakeTime(translate_time_name(&n)),
-        CliCommand::MakePlace{name:n} => Command::MakePlace(translate_place_name(&n)),
-        CliCommand::GotoPlace{name:n} => Command::GotoPlace(n.to_string()),
+        CliCommand::BeatTime{name:n}  => Command::BeAtTime(translate_time_name(&n)),
+        CliCommand::BeAtTime{name:n}  => Command::BeAtTime(translate_time_name(&n)),
+        CliCommand::BeginTime{name:n} => Command::BeginTime(translate_time_name(&n)),
+        CliCommand::EndTime           => Command::EndTime,
+
+        CliCommand::MakePlace{name:n}  => Command::MakePlace(translate_place_name(&n)),
+        CliCommand::GoToPlace{name:n}  => Command::GoToPlace(translate_place_name(&n)),
+        CliCommand::BeginPlace{name:n} => Command::BeginPlace(translate_place_name(&n)),
+        CliCommand::EndPlace           => Command::EndPlace,
 
         CliCommand::BitmapEditor  => Command::Bitmap(bitmap::Command::Editor),
         CliCommand::BitmapMake8x8 => Command::Bitmap(bitmap::Command::Init(bitmap::InitCommand::Make8x8)),
@@ -314,14 +393,20 @@ fn main() {
                 }
             }
         },
-        CliCommand::Save              => { eval::eval(&mut state, &command).unwrap(); }
-        CliCommand::Restore           => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::Save{..}          => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::Restore{..}       => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::Undo              => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::Redo              => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::BitmapMake8x8     => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::MakeTime{..}      => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::BeatTime{..}      => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::BeAtTime{..}      => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::BeginTime{..}     => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::EndTime           => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::MakePlace{..}     => { eval::eval(&mut state, &command).unwrap(); }
-        CliCommand::GotoPlace{..}     => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::GoToPlace{..}     => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::BeginPlace{..}    => { eval::eval(&mut state, &command).unwrap(); }
+        CliCommand::EndPlace          => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::BitmapToggle      => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::BitmapMove{..}    => { eval::eval(&mut state, &command).unwrap(); }
         CliCommand::ReadLine          => {
