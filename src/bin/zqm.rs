@@ -303,18 +303,19 @@ pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
     use sdl2::event::EventType;
     //use sdl2::keyboard::Keycode;
 
-
-
+    let grid_size = (8, 8);
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let zoom = 64u32;
     let window = video_subsystem
         .window("zoom-quilt-make::bitmap",
-                8 * zoom + 1,
-                8 * zoom + 1)
+                grid_size.0 * zoom + 1,
+                grid_size.1 * zoom + 1)
         .position_centered()
-    //.fullscreen()
-    //.fullscreen_desktop()
+        .resizable()
+        .input_grabbed()
+        //.fullscreen()
+        //.fullscreen_desktop()
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -326,13 +327,15 @@ pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
     info!("Using SDL_Renderer \"{}\"", canvas.info().name);
 
     let mut event_pump = sdl_context.event_pump()?;
+
     event_pump.disable_event(EventType::FingerUp);
     event_pump.disable_event(EventType::FingerDown);
     event_pump.disable_event(EventType::FingerMotion);
     event_pump.disable_event(EventType::MouseMotion);
+
     'running: loop {
         let event = event_pump.wait_event();
-        trace!("{:?}", event);
+        debug!("{:?}", event);
         match bitmap::io::consume_input(event) {
             Ok(commands) => {
                 for c in commands.iter() {
