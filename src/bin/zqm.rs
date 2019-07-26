@@ -332,7 +332,7 @@ pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
     event_pump.disable_event(EventType::MouseMotion);
     'running: loop {
         let event = event_pump.wait_event();
-        debug!("{:?}", event);
+        trace!("{:?}", event);
         match bitmap::io::consume_input(event) {
             Ok(commands) => {
                 for c in commands.iter() {
