@@ -179,14 +179,20 @@ pub mod util {
     pub fn name_of_str(s:&str) -> Name {
         let atom = NameAtom::String(s.to_string());
         Name{tree:Box::new(NameTree::Atom(atom))}
-    }   
+    }
+
+    pub fn name_of_usize(u:usize) -> Name {
+        let atom = NameAtom::Usize(u);
+        Name{tree:Box::new(NameTree::Atom(atom))}
+    }
 
     pub fn name_of_string(s:String) -> Name {
         let atom = NameAtom::String(s);
         Name{tree:Box::new(NameTree::Atom(atom))}
-    }   
+    }
 }
-        
+
+
 /*
 
 /// A `History` generalizes the relationship between interactive
@@ -269,3 +275,4 @@ impl FromStr for Name {
     }
 }
 */
+

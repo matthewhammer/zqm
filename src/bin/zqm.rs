@@ -303,19 +303,20 @@ pub fn sdl2_bitmap_editor(editor: &mut bitmap::Editor) -> Result<(), String> {
     use sdl2::event::EventType;
     //use sdl2::keyboard::Keycode;
 
-    let grid_size = (8, 8);
+    let grid_size = (16, 16);
+    let zoom = 32u32;
+
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
-    let zoom = 64u32;
     let window = video_subsystem
         .window("zoom-quilt-make::bitmap",
                 grid_size.0 * zoom + 1,
                 grid_size.1 * zoom + 1)
         .position_centered()
         .resizable()
-        .input_grabbed()
-        //.fullscreen()
-        //.fullscreen_desktop()
+        //.input_grabbed()
+        .fullscreen()
+        .fullscreen_desktop()
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -390,7 +391,7 @@ fn main() {
                     bitmap::semantics::editor_eval(
                         &mut state.bitmap_editor,
                         &bitmap::Command::Init(
-                            bitmap::InitCommand::Make8x8
+                            bitmap::InitCommand::Make16x16
                         )
                     ).unwrap();
                     sdl2_bitmap_editor(&mut state.bitmap_editor).unwrap();

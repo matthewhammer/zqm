@@ -137,10 +137,11 @@ pub mod io {
         use sdl2::rect::{Rect};
         use sdl2::pixels::Color;
 
-        let zoom = 64u32;
-        let width = 8u32;
-        let height = 8u32;
-        let border_width = 2u32;
+        let zoom = 32 as usize;
+        let (width, height) = super::semantics::bitmap_get_size(
+            &edit_state.bitmap
+        );
+        let border_width = 2 as usize;
 
         let grid_border_color = Color::RGB(100, 80, 100);
         let cursor_border_color = Color::RGB(150, 255, 150);
@@ -149,7 +150,7 @@ pub mod io {
             // cell colors, based on two bits:
             let color_notset_notfocus = Color::RGB(0, 0, 0);
             let color_notset_isfocus = Color::RGB(0, 100, 0);
-            let color_isset_notfocus = Color::RGB(255, 245, 255);
+            let color_isset_notfocus = Color::RGB(255, 225, 255);
             let color_isset_isfocus = Color::RGB(240, 250, 240);
             match (is_set, is_focus) {
             | (false, false) => color_notset_notfocus,
@@ -160,10 +161,10 @@ pub mod io {
         };
 
         let cursor_rect = Rect::new(
-            edit_state.cursor.0 as i32 * zoom as i32 - border_width as i32,
-            edit_state.cursor.1 as i32 * zoom as i32 - border_width as i32,
-            zoom + border_width * 2,
-            zoom + border_width * 2,
+            (edit_state.cursor.0 * zoom) as i32 - border_width as i32,
+            (edit_state.cursor.1 * zoom) as i32 - border_width as i32,
+            (zoom + border_width * 2) as u32,
+            (zoom + border_width * 2) as u32,
         );
 
         // grid border is a single background rect:
@@ -172,21 +173,21 @@ pub mod io {
             Rect::new(
                 0,
                 0,
-                width * zoom + border_width,
-                height * zoom + border_width,
+                (width * zoom + border_width) as u32,
+                (height * zoom + border_width) as u32,
             )
         )?;
         canvas.set_draw_color(cursor_border_color);
         canvas.fill_rect(cursor_rect)?;
         // grid cells are rects:
-        for x in 0i32..width as i32 {
-            for y in 0i32..height as i32 {
+        for x in 0..width {
+            for y in 0..height {
                 let cell_rect =
                     Rect::new(
-                        x * zoom as i32 + border_width as i32,
-                        y * zoom as i32 + border_width as i32,
-                        zoom            - border_width * 2,
-                        zoom            - border_width * 2,
+                        (x * zoom + border_width) as i32,
+                        (y * zoom + border_width) as i32,
+                        (zoom as i32 - (border_width * 2) as i32) as u32,
+                        (zoom as i32 - (border_width * 2) as i32) as u32,
                     );
                 let bit = super::semantics::bitmap_get_bit(
                     &edit_state.bitmap, x as usize, y as usize
@@ -239,6 +240,10 @@ pub mod semantics {
         };
         trace!("bitmap_get_bit({}, {}) = {}", x, y, b);
         b
+    }
+
+    pub fn bitmap_get_size(bitmap:&Bitmap) -> (usize, usize) {
+        (bitmap.width, bitmap.height)
     }
 
     pub fn bitmap_toggle_bit(bitmap:&mut Bitmap, x:usize, y:usize) -> bool {
