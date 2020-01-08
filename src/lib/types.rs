@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 /// a grid of bits, represented as a 2D array
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Media {
     Void,
     Atom(Atom),
@@ -31,6 +31,12 @@ pub enum Command {
     Bitmap(super::bitmap::Command),
     Chain(super::chain::Command),
     Grid(super::grid::Command),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Dir1D {
+    Forward,
+    Backward,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +78,7 @@ pub enum Atom {
     // Eventually(as of 2020-01-04): Permit Media to name Media.
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Location {
     pub time:  Name,
     pub place: Name,

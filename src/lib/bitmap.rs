@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use types::{Nat, Dir2D};
 
 /// a grid of bits, represented as a 2D array
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Bitmap {
     pub width: Nat,
     pub height: Nat,
@@ -13,7 +13,7 @@ pub struct Bitmap {
 }
 
 /// row-versus-column major order for grid representation
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Major {
     /// row major ordering (rows indexed first, then columns)
     Row,
