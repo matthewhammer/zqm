@@ -7,6 +7,7 @@ use super::types::{
 
 use sdl2::event::Event;
 pub fn consume_input(state: &mut State, event:Event) -> Result<Vec<Command>, ()> {
+    debug!("{:?}", event);
     match (&mut state.editor) {
         (&mut Editor::Bitmap(ref ed)) => {
             super::bitmap::io::consume_input(event)
@@ -24,6 +25,7 @@ pub fn consume_input(state: &mut State, event:Event) -> Result<Vec<Command>, ()>
 }
 
 pub fn eval_command(state: &mut State, command:&Command) -> Result<(), String> {
+    debug!("{:?}", command);
     match (command, &mut state.editor) {
         (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
             super::bitmap::semantics::editor_eval(be, bc)

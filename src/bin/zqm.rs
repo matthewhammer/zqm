@@ -103,7 +103,6 @@ pub fn do_event_loop(state: &mut types::State) -> Result<(), String> {
 
     'running: loop {
         let event = event_pump.wait_event();
-        debug!("{:?}", event);
         match eval::consume_input(state, event) {
             Ok(commands) => {
                 for c in commands.iter() {
