@@ -1,95 +1,36 @@
+// Note: Using Box<_> in places where I might like Rc<_>;
+//       Serde does not work for Rc<_> out of the box
+//       Same issue for HashMap<_> uses here.
 
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
 
-pub type Hash = u64;
-pub type Nat = usize;
-
-pub type Map<X,Y> = std::collections::HashMap<X,Y>;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct Name {
-    pub tree: Box<NameTree>,
-    //pub hash: Hash,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum NameTree {
-    Atom(NameAtom),
-    Option(Option<Name>),
-    TaggedTuple(Name, Vec<Name>)
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum NameAtom {
-    Bool(bool),
-    Usize(usize),
-    String(String),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NameFn {  // to do
-    pub path: Vec<Name>
+/// a grid of bits, represented as a 2D array
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Media {
+    Void,
+    Atom(Atom),
+    Name(Name),
+    Location(Location),
+    Named(Name, Box<Media>),
+    Located(Location, Box<Media>),
+    Bitmap(Box<super::bitmap::Bitmap>),
+    Chain(Box<super::chain::Chain>),
+    Grid(Box<super::grid::Grid>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Point {
-    pub time:  Name,
-    pub place: Name,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Space {
-    pub time:  NameFn,
-    pub place: NameFn,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Locus {
-    pub point: Point,
-    pub space: Space,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CliCommand {
-    Version,
-    Completions(String),
-    // to do: make a simple module for text entry/editing,
-    // and/or, use existing readline library
-    ReadLine,
+pub enum Editor {
+    Bitmap(Box<super::bitmap::Editor>),
+    Chain(Box<super::chain::Editor>),
+    Grid(Box<super::grid::Editor>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Command {
-    CliCommand(CliCommand),
-
-    MakeTime(Name),
-    BeAtTime(Name),
-    BeginTime(Name),
-    EndTime,
-
-    MakePlace(Name),
-    GoToPlace(Name),
-    BeginPlace(Name),
-    EndPlace,
-
     Bitmap(super::bitmap::Command),
-
-    // save/restore manages editor state via an ambient store of named editor states
-    Save(Name),
-    Restore(Name),
-
-    // undo/redo manages editor states via an ambient n-ary tree zipper of past commands,
-    // and associated states (think "emacs undo tree").
-    Undo,
-    Redo,
-
-    // how do save/restore and undo/redo interact?
-    // do undo or redo alter the stack?
-    // do save or restore alter the tree, or the position in it?
-
-    // the answer is all/none of the above!
-    // we should experiment and see.
+    Chain(super::chain::Command),
+    Grid(super::grid::Command),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,20 +41,102 @@ pub enum Dir2D {
     Right
 }
 
-
-/// a state conists of a locus and a tuple of editor states, across the zqm modules.
-///
-/// the state tuple has an editor component per possible (concurrent, independent) editor type
-/// (but for now, we just edit bitmaps)
 #[derive(Debug, Serialize, Deserialize)]
 pub struct State {
-    pub locus: Locus,
-    pub bitmap_editor: super::bitmap::Editor,
+    pub editor: Editor,
 }
 
-/// a state store maps state names to states
+pub type Hash = u64;
+pub type Nat = usize;
+
+pub type Map<X,Y> = std::collections::HashMap<X,Y>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct Name {
+    pub tree: Box<NameTree>,
+    // Eventually(as of 2020-01-04): pub hash: Hash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum NameTree {
+    Atom(Atom),
+    Option(Option<Name>),
+    TaggedTuple(Name, Vec<Name>)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum Atom {
+    Bool(bool),
+    Usize(usize),
+    String(String),
+    // Eventually(as of 2020-01-04): Permit Media to name Media.
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StateStore( Map<Name, State> );
+pub struct Location {
+    pub time:  Name,
+    pub place: Name,
+}
+
+
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+pub mod render {
+    use sdl2::pixels::Color;
+
+    pub struct Dim {
+        pub width: usize,
+        pub height: usize,
+    }
+    pub struct Pos {
+        pub x: usize,
+        pub y: usize,
+    }
+    pub struct Rect {
+        pub pos: Pos,
+        pub dim: Dim,
+    }
+    pub struct Node {
+        pub rect: Rect,
+        pub children: Elms,
+    }
+    pub enum Elm {
+        FillRect(Rect, Color),
+        OpenRect(Rect, Color),
+        Node(Box<Node>)
+    }
+    pub type Elms = Vec<Elm>;
+}
+
+
+pub mod util {
+    use super::*;
+
+    /*
+    pub fn namefn_id() -> NameFn {
+        NameFn{path:vec![]}
+    }
+     */
+
+    pub fn name_of_str(s:&str) -> Name {
+        let atom = Atom::String(s.to_string());
+        Name{tree:Box::new(NameTree::Atom(atom))}
+    }
+
+    pub fn name_of_usize(u:usize) -> Name {
+        let atom = Atom::Usize(u);
+        Name{tree:Box::new(NameTree::Atom(atom))}
+    }
+
+    pub fn name_of_string(s:String) -> Name {
+        let atom = Atom::String(s);
+        Name{tree:Box::new(NameTree::Atom(atom))}
+    }
+}
+
+
+/*
 
 /// a state store tree cursor
 ///
@@ -168,30 +191,7 @@ pub struct BranchingStateTransCtx {
     ctx: StateStoreTreeCtx,
     command: Command,
 }
-
-pub mod util {
-    use super::*;
-
-    pub fn namefn_id() -> NameFn {
-        NameFn{path:vec![]}
-    }
-
-    pub fn name_of_str(s:&str) -> Name {
-        let atom = NameAtom::String(s.to_string());
-        Name{tree:Box::new(NameTree::Atom(atom))}
-    }
-
-    pub fn name_of_usize(u:usize) -> Name {
-        let atom = NameAtom::Usize(u);
-        Name{tree:Box::new(NameTree::Atom(atom))}
-    }
-
-    pub fn name_of_string(s:String) -> Name {
-        let atom = NameAtom::String(s);
-        Name{tree:Box::new(NameTree::Atom(atom))}
-    }
-}
-
+*/
 
 /*
 
@@ -275,4 +275,3 @@ impl FromStr for Name {
     }
 }
 */
-

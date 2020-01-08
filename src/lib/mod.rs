@@ -12,6 +12,9 @@ pub mod macros;
 pub type Glyph = bitmap::Bitmap;
 pub type GlyphMap = std::collections::HashMap<types::Name, Glyph>;
 
+pub mod chain;
+pub mod grid;
+
 pub mod types;
 pub mod eval;
 pub mod bitmap;

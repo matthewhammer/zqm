@@ -43,7 +43,7 @@ pub struct EditorState {
     pub cursor: (Nat, Nat)
 }
 
-/// the history-_dependent_ state of the editor
+/// the history-_dependent_ state of the editoro
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Editor {
     /// full linear history of this bitmap's evolution, as a sequence of commands
@@ -93,15 +93,12 @@ pub enum Command {
     /// commands that advance the editor state,
     /// and possibly, its associated bitmap state
     Edit(EditCommand),
-
-    /// User requests an interactive editor from which to issue
-    /// further commands
-    Editor,
 }
 
 pub mod io {
     use super::{EditorState, EditCommand, Dir2D};
     use sdl2::event::Event;
+    use types::render;
 
     pub fn consume_input(event:Event) -> Result<Vec<EditCommand>, ()> {
         use sdl2::keyboard::Keycode;
@@ -129,11 +126,12 @@ pub mod io {
     }
 
     use sdl2::render::{Canvas, RenderTarget};
-    pub fn produce_output<T: RenderTarget>(
+    pub fn render_elms<T: RenderTarget>(
         canvas: &mut Canvas<T>,
         edit_state: &EditorState,
-    ) -> Result<(), String>
+    ) -> Result<render::Elms, String>
     {
+        let mut out : render::Elms = vec![];
         use sdl2::rect::{Rect};
         use sdl2::pixels::Color;
 
@@ -200,8 +198,10 @@ pub mod io {
             }
         }
         canvas.present();
-        Ok(())
+        // todo
+        Ok(vec![])
     }
+
 }
 
 /// semantic definitions for bitmaps and bitmap editors.
@@ -323,13 +323,6 @@ pub mod semantics {
                 match editor.state {
                     None => Err("Invalid editor state".to_string()),
                     Some(ref mut st) => editor_state_eval(st, &command),
-                }
-            }
-            &Command::Editor => {
-                // Test if the editor state is initialized; Err if not; Ok if so.
-                match editor.state {
-                    None => Err("Invalid editor state".to_string()),
-                    Some(ref mut _st) => Ok(()),
                 }
             }
         }

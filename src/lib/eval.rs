@@ -1,61 +1,89 @@
-use super::{
-    types::{Name,  NameFn,
-            Point, Space,
-            Locus, Command,
-            State,
-            util::{
-                name_of_str, 
-                namefn_id
-            }
-    }
+use super::types::{
+    State,
+    Editor,
+    Command,
+    render,
 };
+
+use sdl2::event::Event;
+pub fn consume_input(state: &mut State, event:Event) -> Result<Vec<Command>, ()> {
+    match (&mut state.editor) {
+        (&mut Editor::Bitmap(ref ed)) => {
+            super::bitmap::io::consume_input(event)
+                .map(|ed_cmds|
+                     ed_cmds.into_iter().map(|ed_cmd|
+                                             Command::Bitmap(super::bitmap::Command::Edit(ed_cmd))).collect())
+        },
+        (&mut Editor::Chain(ref mut ed)) => {
+            unimplemented!()
+        }
+        (&mut Editor::Grid(ref mut ed)) => {
+            unimplemented!()
+        }
+    }
+}
+
+pub fn eval_command(state: &mut State, command:&Command) -> Result<(), String> {
+    match (command, &mut state.editor) {
+        (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
+            super::bitmap::semantics::editor_eval(be, bc)
+        },
+        (&Command::Bitmap(ref _bc), _) => { Err("bitmap editor expected bitmap command".to_string()) }
+        (_, &mut Editor::Bitmap(ref mut _be)) => { Err("bitmap command for non-bitmap editor".to_string()) }
+
+        (&Command::Chain(ref _ch), _) => {
+            unimplemented!()
+        }
+        (&Command::Grid(ref _gr), _) => {
+            unimplemented!()
+        }
+    }
+
+}
+
 
 // to do: take "genesis" arguments:
 // - user's self-symbol abbreviation
 // - current date, time, place, etc
 // - OS filesystem paths for archiving
 pub fn init_state() -> State {
-    let here : Name   = name_of_str("here");
-    let now  : Name   = name_of_str("now");
-    let id   : NameFn = namefn_id();
-
-    let locus_init = Locus{
-        point: Point{
-            place: here,
-            time:  now,
-        },
-        space: Space {
-            place: id.clone(),
-            time:  id,
-        },
+    let mut state_init = State {
+        editor: super::types::Editor::Bitmap(
+            Box::new(
+                super::bitmap::Editor {
+                    state: None,
+                    history: vec![],
+                }
+            )
+        ),
     };
-    let state_init = State {
-        locus: locus_init,
-        bitmap_editor: super::bitmap::Editor {
-            state: None,
-            history: vec![],
-        },
-    };
+    let init_command = Command::Bitmap(
+        super::bitmap::Command::Init(
+            super::bitmap::InitCommand::Make16x16
+        )
+    );
+    eval_command(&mut state_init, &init_command);
     state_init
 }
 
-pub fn eval(state: &mut State, command:&Command) -> Result<(), String> {
-    match command {
-        &Command::CliCommand(ref _cc) => Err("invalid command".to_string()),
-        &Command::MakeTime(_) => unimplemented!(),
-        &Command::BeAtTime(_) => unimplemented!(),
-        &Command::BeginTime(_) => unimplemented!(),
-        &Command::EndTime      => unimplemented!(),
-        &Command::MakePlace(_) => unimplemented!(),
-        &Command::GoToPlace(_) => unimplemented!(),
-        &Command::BeginPlace(_) => unimplemented!(),
-        &Command::EndPlace     => unimplemented!(),
-        &Command::Save(_)      => unimplemented!(),
-        &Command::Restore(_)   => unimplemented!(),
-        &Command::Undo         => unimplemented!(),
-        &Command::Redo         => unimplemented!(),
-        &Command::Bitmap(ref bc) => {
-            super::bitmap::semantics::editor_eval(&mut state.bitmap_editor, bc)
+use sdl2::render::{Canvas, RenderTarget};
+pub fn render_elms<T: RenderTarget>(
+    canvas: &mut Canvas<T>,
+    state: &State) -> Result<render::Elms, String>
+{
+    match &state.editor {
+        &Editor::Bitmap(ref ed) => {
+            match ed.state {
+                None => Ok(vec![]),
+                Some(ref ed) =>
+                    super::bitmap::io::render_elms(canvas, ed)
+            }
+        },
+        &Editor::Chain(ref _ch) => {
+            unimplemented!()
+        }
+        &Editor::Grid(ref _gr) => {
+            unimplemented!()
         }
     }
 
