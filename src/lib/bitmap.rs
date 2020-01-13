@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 
 use types::{Nat, Dir2D};
 
+// Step 1:
+// -------
+// Define the structure, in terms of "simplified, affine Rust"
+// (no references or lifetimes; everything is affine, so no Rc<_>s either.)
+
 /// a grid of bits, represented as a 2D array
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Bitmap {
@@ -22,6 +27,10 @@ pub enum Major {
     Col
 }
 
+// Step 2:
+// -------
+// Define the structure's "auto commands", as a DSL datatype.
+
 /// commands that advance the state of the bitmap,
 /// whose execution is independent of editor state
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +42,11 @@ pub enum AutoCommand {
     SetBit(Nat, Nat, bool),
 }
 
+// Step 3:
+// -------
+//
+// Define a canonical editor for the structure in question.  Again, use simplified, affine Rust.
+
 /// the history-_independent_ state of the editor
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EditorState {
@@ -43,6 +57,10 @@ pub struct EditorState {
     pub cursor: (Nat, Nat)
 }
 
+// Step (3b) --
+// The `Editor` definition
+//   includes the command history, and any "pre-states" before initialization completes.
+
 /// the history-_dependent_ state of the editoro
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Editor {
@@ -52,6 +70,10 @@ pub struct Editor {
     /// current state of the bitmap and surrounding editor environment
     pub state: Option<EditorState>,
 }
+
+// Step 4a:
+// -------
+// Define commands that initialize the editor state.
 
 /// commands that create new bitmaps
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,6 +87,11 @@ pub enum InitCommand {
     /// make a new 32x32 grid of bits
     Make32x32,
 }
+
+// Step 4b:
+// -------
+// Define commands that evolve the editor state with edits,
+//   or changes to the edit state (cursor location).
 
 /// commands that advance the editor state,
 /// and possibly, its associated bitmap state.
@@ -80,6 +107,12 @@ pub enum EditCommand {
     Toggle,
 }
 
+// Step 4c:
+// -------
+//
+// Define a combined language of commands that includes (distinct) Init, Auto
+// and Edit sublanguages.
+
 /// commands that advance the evolution of a bitmap
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Command {
@@ -94,6 +127,13 @@ pub enum Command {
     /// and possibly, its associated bitmap state
     Edit(EditCommand),
 }
+
+// Step 5:
+// -------
+//
+// Define the IO for the Editor.  We use SDL for system-level IO on Mac/Linux.
+
+// TODO: We are going to use our own `render` elements (types::render::Elms) soon.
 
 pub mod io {
     use super::{EditorState, EditCommand, Dir2D};
@@ -203,6 +243,11 @@ pub mod io {
     }
 
 }
+
+// Step 6:
+// -------
+//
+// Define the state-change semantics for the command languages.
 
 /// semantic definitions for bitmaps and bitmap editors.
 ///

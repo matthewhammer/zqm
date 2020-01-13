@@ -16,13 +16,16 @@ pub enum Chain {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AutoCommand {
+    InsertStart(Media),
+    DeleteStart,
+    InsertEnd(Media),
+    DeleteEnd,
+    Replace(Name, Media)
     InsertAfter(Name, Media),
     DeleteAfter(Name),
     InsertBefore(Name, Media),
     DeleteBefore(Name),
-    Replace(Name, Media)
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Editor {
