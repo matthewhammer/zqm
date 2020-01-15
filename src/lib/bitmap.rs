@@ -131,122 +131,6 @@ pub enum Command {
 // Step 5:
 // -------
 //
-// Define the IO for the Editor.  We use SDL for system-level IO on Mac/Linux.
-
-// TODO: We are going to use our own `render` elements (types::render::Elms) soon.
-
-pub mod io {
-    use super::{EditorState, EditCommand, Dir2D};
-    use sdl2::event::Event;
-    use types::render;
-
-    pub fn consume_input(event:Event) -> Result<Vec<EditCommand>, ()> {
-        use sdl2::keyboard::Keycode;
-        match event {
-            Event::Quit {..}
-            | Event::KeyDown {
-                keycode: Some(Keycode::Escape), ..
-            } => {
-                Err(())
-            },
-            Event::KeyDown{keycode:Some(kc), ..} => {
-                match kc {
-                    Keycode::Space => Ok(vec![EditCommand::Toggle]),
-                    Keycode::Left  => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
-                    Keycode::Right => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
-                    Keycode::Up    => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
-                    Keycode::Down  => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
-                    _              => Ok(vec![]),
-                }
-            },
-            _ => {
-                Ok(vec![])
-            }
-        }
-    }
-
-    use sdl2::render::{Canvas, RenderTarget};
-    pub fn render_elms<T: RenderTarget>(
-        canvas: &mut Canvas<T>,
-        edit_state: &EditorState,
-    ) -> Result<render::Elms, String>
-    {
-        let mut out : render::Elms = vec![];
-        use sdl2::rect::{Rect};
-        use sdl2::pixels::Color;
-
-        let zoom = 32 as usize;
-        let (width, height) = super::semantics::bitmap_get_size(
-            &edit_state.bitmap
-        );
-        let border_width = 2 as usize;
-
-        let grid_border_color = Color::RGB(100, 80, 100);
-        let cursor_border_color = Color::RGB(150, 255, 150);
-
-        fn get_cell_color (is_set:bool, is_focus:bool) -> Color {
-            // cell colors, based on two bits:
-            let color_notset_notfocus = Color::RGB(0, 0, 0);
-            let color_notset_isfocus = Color::RGB(0, 100, 0);
-            let color_isset_notfocus = Color::RGB(255, 225, 255);
-            let color_isset_isfocus = Color::RGB(240, 250, 240);
-            match (is_set, is_focus) {
-            | (false, false) => color_notset_notfocus,
-            | (false, true)  => color_notset_isfocus,
-            | (true,  false) => color_isset_notfocus,
-            | (true,  true)  => color_isset_isfocus,
-            }
-        };
-
-        let cursor_rect = Rect::new(
-            (edit_state.cursor.0 * zoom) as i32 - border_width as i32,
-            (edit_state.cursor.1 * zoom) as i32 - border_width as i32,
-            (zoom + border_width * 2) as u32,
-            (zoom + border_width * 2) as u32,
-        );
-
-        // grid border is a single background rect:
-        canvas.set_draw_color(grid_border_color);
-        canvas.fill_rect(
-            Rect::new(
-                0,
-                0,
-                (width * zoom + border_width) as u32,
-                (height * zoom + border_width) as u32,
-            )
-        )?;
-        canvas.set_draw_color(cursor_border_color);
-        canvas.fill_rect(cursor_rect)?;
-        // grid cells are rects:
-        for x in 0..width {
-            for y in 0..height {
-                let cell_rect =
-                    Rect::new(
-                        (x * zoom + border_width) as i32,
-                        (y * zoom + border_width) as i32,
-                        (zoom as i32 - (border_width * 2) as i32) as u32,
-                        (zoom as i32 - (border_width * 2) as i32) as u32,
-                    );
-                let bit = super::semantics::bitmap_get_bit(
-                    &edit_state.bitmap, x as usize, y as usize
-                );
-                let cell_color = get_cell_color(bit, (x as usize, y as usize) == edit_state.cursor);
-                canvas.set_draw_color(cell_color);
-                canvas.fill_rect(cell_rect)?;
-                canvas.set_draw_color(grid_border_color);
-                canvas.draw_rect(cell_rect)?;
-            }
-        }
-        canvas.present();
-        // todo
-        Ok(vec![])
-    }
-
-}
-
-// Step 6:
-// -------
-//
 // Define the state-change semantics for the command languages.
 
 /// semantic definitions for bitmaps and bitmap editors.
@@ -379,4 +263,120 @@ pub mod semantics {
             }
         }
     }
+}
+
+// Step 6:
+// -------
+//
+// Define the IO for the Editor.  We use SDL for system-level IO on Mac/Linux.
+
+// TODO: We are going to use our own `render` elements (types::render::Elms) soon.
+
+pub mod io {
+    use super::{EditorState, EditCommand, Dir2D};
+    use sdl2::event::Event;
+    use types::render;
+
+    pub fn consume_input(event:Event) -> Result<Vec<EditCommand>, ()> {
+        use sdl2::keyboard::Keycode;
+        match event {
+            Event::Quit {..}
+            | Event::KeyDown {
+                keycode: Some(Keycode::Escape), ..
+            } => {
+                Err(())
+            },
+            Event::KeyDown{keycode:Some(kc), ..} => {
+                match kc {
+                    Keycode::Space => Ok(vec![EditCommand::Toggle]),
+                    Keycode::Left  => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
+                    Keycode::Right => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
+                    Keycode::Up    => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
+                    Keycode::Down  => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
+                    _              => Ok(vec![]),
+                }
+            },
+            _ => {
+                Ok(vec![])
+            }
+        }
+    }
+
+    use sdl2::render::{Canvas, RenderTarget};
+    pub fn render_elms<T: RenderTarget>(
+        canvas: &mut Canvas<T>,
+        edit_state: &EditorState,
+    ) -> Result<render::Elms, String>
+    {
+        let mut out : render::Elms = vec![];
+        use sdl2::rect::{Rect};
+        use sdl2::pixels::Color;
+
+        let zoom = 32 as usize;
+        let (width, height) = super::semantics::bitmap_get_size(
+            &edit_state.bitmap
+        );
+        let border_width = 2 as usize;
+
+        let grid_border_color = Color::RGB(100, 80, 100);
+        let cursor_border_color = Color::RGB(150, 255, 150);
+
+        fn get_cell_color (is_set:bool, is_focus:bool) -> Color {
+            // cell colors, based on two bits:
+            let color_notset_notfocus = Color::RGB(0, 0, 0);
+            let color_notset_isfocus = Color::RGB(0, 100, 0);
+            let color_isset_notfocus = Color::RGB(255, 225, 255);
+            let color_isset_isfocus = Color::RGB(240, 250, 240);
+            match (is_set, is_focus) {
+            | (false, false) => color_notset_notfocus,
+            | (false, true)  => color_notset_isfocus,
+            | (true,  false) => color_isset_notfocus,
+            | (true,  true)  => color_isset_isfocus,
+            }
+        };
+
+        let cursor_rect = Rect::new(
+            (edit_state.cursor.0 * zoom) as i32 - border_width as i32,
+            (edit_state.cursor.1 * zoom) as i32 - border_width as i32,
+            (zoom + border_width * 2) as u32,
+            (zoom + border_width * 2) as u32,
+        );
+
+        // grid border is a single background rect:
+        canvas.set_draw_color(grid_border_color);
+        canvas.fill_rect(
+            Rect::new(
+                0,
+                0,
+                (width * zoom + border_width) as u32,
+                (height * zoom + border_width) as u32,
+            )
+        )?;
+        canvas.set_draw_color(cursor_border_color);
+        canvas.fill_rect(cursor_rect)?;
+        // grid cells are rects:
+        for x in 0..width {
+            for y in 0..height {
+                let cell_rect =
+                    Rect::new(
+                        (x * zoom + border_width) as i32,
+                        (y * zoom + border_width) as i32,
+                        (zoom as i32 - (border_width * 2) as i32) as u32,
+                        (zoom as i32 - (border_width * 2) as i32) as u32,
+                    );
+                let bit = super::semantics::bitmap_get_bit(
+                    &edit_state.bitmap, x as usize, y as usize
+                );
+                let cell_color = get_cell_color(bit, (x as usize, y as usize) == edit_state.cursor);
+                canvas.set_draw_color(cell_color);
+                canvas.fill_rect(cell_rect)?;
+                canvas.set_draw_color(grid_border_color);
+                canvas.draw_rect(cell_rect)?;
+            }
+        }
+        canvas.present();
+        // todo
+        Ok(vec![])
+    }
+
 }
