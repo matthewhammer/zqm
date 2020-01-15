@@ -298,6 +298,13 @@ pub mod semantics {
         !b
     }
 
+    // a few ideas
+    // 1. create an Eval trait, parameterized by specific media and command types.
+    // 2. each of these functions is also an impl of this trait for some pair of types.
+    // 3. The Result<_,_> types could be richer.
+    // 4. The successful return value could be `Media` (the full adjunction), or another trait param.
+    // 5. The failure error code could be a common error type (every possible error), or a trait param.
+
     pub fn bitmap_eval(bitmap:&mut Bitmap, command:&AutoCommand) -> Result<(), String> {
         trace!("bitmap_eval: {:?}", command);
         match command {

@@ -42,9 +42,9 @@ The `EditorState` definition
 The `Editor` definition
   includes the command history, and any "pre-states" before initialization completes.
 
-## Step 4
+## Step 4: Define command language ASTs.
 
-Define the command languages, in Rust.
+Define the command languages, in Rust, as a system of ASTs.
 
 ## Step 4a: define `Init` commands
 
@@ -60,7 +60,12 @@ Define commands that evolve the editor state with edits,
 Define a combined language of commands that includes (distinct) `Init`, `Auto`
 and `Edit` sublanguages.
 
-## Step 5: Implement system IO for the `Editor`
+## Step 5: Implement command evaluators.
+
+Implement the state-change semantics for the (distinct) `Init`, `Auto`
+and `Edit` command languages as a system of big-step evaluators.
+
+## Step 6: Implement system IO for the `Editor`
 
 Implement system IO for the Editor, using SDL for system-level input
 on Mac/Linux.  This step translates system input events (keyboard
@@ -68,8 +73,3 @@ press) to zero or more commands.  It translates editor states into
 `render` elements (types::render::Elms), for output.  ZQM uses a
 common module to translate these render elements into appropriate SDL
 drawing commands.
-
-## Step 6: Implement command interpreters.
-
-Implement the state-change semantics for the (distinct) `Init`, `Auto`
-and `Edit` command languages.
