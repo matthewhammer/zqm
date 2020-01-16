@@ -103,12 +103,12 @@ pub fn do_event_loop(state: &mut types::State) -> Result<(), String> {
 
     'running: loop {
         let event = event_pump.wait_event();
-        match eval::consume_input(state, event) {
+        match eval::commands_of_event(state, &event) {
             Ok(commands) => {
                 for c in commands.iter() {
                     // note: we borrow the command here, possibly requiring some cloning when it is evaluated.
                     // todo -- we do nothing with the result; we should log it.
-                    eval::eval_command(state, c)?;
+                    eval::command_eval(state, c)?;
                 }
                 let elms = eval::render_elms(&mut canvas, state)?;
                 // todo actually render them

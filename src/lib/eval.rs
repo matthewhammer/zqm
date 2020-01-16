@@ -6,9 +6,9 @@ use super::types::{
 };
 
 use sdl2::event::Event;
-pub fn consume_input(state: &mut State, event:Event) -> Result<Vec<Command>, ()> {
-    debug!("{:?}", event);
-    match &mut state.editor {
+pub fn commands_of_event(state: &mut State, event:&Event) -> Result<Vec<Command>, ()> {
+    debug!("commands_of_event {:?}", &event);
+    let res = match &mut state.editor {
         &mut Editor::Bitmap(ref ed) => {
             super::bitmap::io::consume_input(event)
                 .map(|ed_cmds|
@@ -21,12 +21,14 @@ pub fn consume_input(state: &mut State, event:Event) -> Result<Vec<Command>, ()>
         &mut Editor::Grid(ref mut ed) => {
             unimplemented!()
         }
-    }
+    };
+    debug!("commands_of_event {:?} ==> {:?}", event, res);
+    res
 }
 
-pub fn eval_command(state: &mut State, command:&Command) -> Result<(), String> {
-    debug!("{:?}", command);
-    match (command, &mut state.editor) {
+pub fn command_eval(state: &mut State, command:&Command) -> Result<(), String> {
+    debug!("command_eval {:?}", command);
+    let res = match (command, &mut state.editor) {
         (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
             super::bitmap::semantics::editor_eval(be, bc)
         },
@@ -39,8 +41,9 @@ pub fn eval_command(state: &mut State, command:&Command) -> Result<(), String> {
         (&Command::Grid(ref _gr), _) => {
             unimplemented!()
         }
-    }
-
+    };
+    debug!("command_eval {:?} ==> {:?}", command, res);
+    res
 }
 
 
@@ -64,7 +67,7 @@ pub fn init_state() -> State {
             super::bitmap::InitCommand::Make16x16
         )
     );
-    eval_command(&mut state_init, &init_command);
+    command_eval(&mut state_init, &init_command);
     state_init
 }
 

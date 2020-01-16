@@ -17,6 +17,7 @@ pub struct Node {
 }
 
 /// errors that may arise from chain methods, and `AutoCommand` evaluation.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AutoError {
     /// error for insert/delete/replace when name is absent
     AbsentName(Name, Option<Media>),
@@ -99,14 +100,14 @@ mod semantics {
     use super::{Chain, Command, AutoCommand, EditCommand, EditorState, Res, Media};
 
     // todo -- if we instead assume a moved Command rather than a borrowed one, we avoid clone()s here?
-    //         OTOH, if we use a borrow, the Command constructors are affine too, which can be annoying?
+    //         OTOH, if we use a borrow, the Command constructors are affine too, which can be annoying, esp for logging.
 
     pub fn chain_eval(chain:&mut Chain, command: &AutoCommand) -> Res<Option<Media>> {
-        trace!("chain_eval: {:?}", command);
+        trace!("chain_eval {:?} ...", command);
         use self::AutoCommand::*;
         pub fn some(r:Res<Media>) -> Res<Option<Media>> { r.map(|m| Some(m)) };
         pub fn none(r:Res<()>) -> Res<Option<Media>> { r.map(|_| None) };
-        match &command {
+        let res = match &command {
             InsertStart(ref m) => none(chain.insert_start(m.clone())),
             DeleteStart        => some(chain.delete_start()),
             InsertEnd(ref m)   => none(chain.insert_end(m.clone())),
@@ -116,7 +117,9 @@ mod semantics {
             DeleteAfter(ref n)         => some(chain.delete_after(n.clone())),
             InsertBefore(ref n, ref m) => none(chain.insert_before(n.clone(), m.clone())),
             DeleteBefore(ref n)        => some(chain.delete_before(n.clone())),
-        }
+        };
+        trace!("chain_eval {:?} ==> {:?}", command, res);
+        res
     }
 
     pub fn editor_state_eval(editor:&mut EditorState,

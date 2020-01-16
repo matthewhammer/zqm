@@ -277,17 +277,17 @@ pub mod io {
     use sdl2::event::Event;
     use types::render;
 
-    pub fn consume_input(event:Event) -> Result<Vec<EditCommand>, ()> {
+    pub fn consume_input(event:&Event) -> Result<Vec<EditCommand>, ()> {
         use sdl2::keyboard::Keycode;
-        match event {
+        match &event {
             Event::Quit {..}
             | Event::KeyDown {
                 keycode: Some(Keycode::Escape), ..
             } => {
                 Err(())
             },
-            Event::KeyDown{keycode:Some(kc), ..} => {
-                match kc {
+            Event::KeyDown{keycode:Some(ref kc), ..} => {
+                match &kc {
                     Keycode::Space => Ok(vec![EditCommand::Toggle]),
                     Keycode::Left  => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
                     Keycode::Right => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
