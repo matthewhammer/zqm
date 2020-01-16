@@ -106,6 +106,8 @@ pub fn do_event_loop(state: &mut types::State) -> Result<(), String> {
         match eval::consume_input(state, event) {
             Ok(commands) => {
                 for c in commands.iter() {
+                    // note: we borrow the command here, possibly requiring some cloning when it is evaluated.
+                    // todo -- we do nothing with the result; we should log it.
                     eval::eval_command(state, c)?;
                 }
                 let elms = eval::render_elms(&mut canvas, state)?;

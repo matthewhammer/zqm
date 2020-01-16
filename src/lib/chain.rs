@@ -2,16 +2,41 @@
 use serde::{Deserialize, Serialize};
 use types::{Media, Name, Dir1D};
 
+/// a chain is an affine linked-list of nodes, each with optionally-named media.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Chain {
+    Empty,
+    Node(Node, Box<Chain>),
+}
+
+/// a node contains media, with an optional name.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node {
     pub name: Option<Name>,
     pub media: Box<Media>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Chain {
-    Empty,
-    Node(Node, Box<Chain>),
+/// errors that may arise from chain methods, and `AutoCommand` evaluation.
+pub enum AutoError {
+    /// error for insert/delete/replace when name is absent
+    AbsentName(Name, Option<Media>),
+    /// error for delete command when media is absent
+    AbsentMedia(Option<Name>),
+}
+
+pub type Res<R> = Result<R, AutoError>;
+pub type Unit = Res<()>;
+
+impl Chain {
+    pub fn insert_start(&mut self, media:Media) -> Unit { unimplemented!() }
+    pub fn delete_start(&mut self) -> Res<Media> { unimplemented!() }
+    pub fn insert_end(&mut self, media:Media) -> Unit { unimplemented!() }
+    pub fn delete_end(&mut self) -> Res<Media> { unimplemented!() }
+    pub fn replace(&mut self, name:Name, media:Media) -> Res<Media> { unimplemented!() }
+    pub fn insert_after(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
+    pub fn delete_after(&mut self, name:Name) -> Res<Media> { unimplemented!() }
+    pub fn insert_before(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
+    pub fn delete_before(&mut self, name:Name) -> Res<Media> { unimplemented!() }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -70,11 +95,28 @@ pub enum Command {
 }
 
 mod semantics {
-    use super::{Chain, Command, AutoCommand, EditCommand, InitCommand, Editor, EditorState};
+    //use super::{Chain, Command, AutoCommand, EditCommand, InitCommand, Editor, EditorState};
+    use super::{Chain, Command, AutoCommand, EditCommand, EditorState, Res, Media};
 
-    pub fn chain_eval(chain:&mut Chain, command: &AutoCommand) -> Result<(), String> {
+    // todo -- if we instead assume a moved Command rather than a borrowed one, we avoid clone()s here?
+    //         OTOH, if we use a borrow, the Command constructors are affine too, which can be annoying?
+
+    pub fn chain_eval(chain:&mut Chain, command: &AutoCommand) -> Res<Option<Media>> {
         trace!("chain_eval: {:?}", command);
-        unimplemented!()
+        use self::AutoCommand::*;
+        pub fn some(r:Res<Media>) -> Res<Option<Media>> { r.map(|m| Some(m)) };
+        pub fn none(r:Res<()>) -> Res<Option<Media>> { r.map(|_| None) };
+        match &command {
+            InsertStart(ref m) => none(chain.insert_start(m.clone())),
+            DeleteStart        => some(chain.delete_start()),
+            InsertEnd(ref m)   => none(chain.insert_end(m.clone())),
+            DeleteEnd          => some(chain.delete_end()),
+            Replace(ref n, ref m)      => some(chain.replace(n.clone(), m.clone())),
+            InsertAfter(ref n, ref m)  => none(chain.insert_after(n.clone(), m.clone())),
+            DeleteAfter(ref n)         => some(chain.delete_after(n.clone())),
+            InsertBefore(ref n, ref m) => none(chain.insert_before(n.clone(), m.clone())),
+            DeleteBefore(ref n)        => some(chain.delete_before(n.clone())),
+        }
     }
 
     pub fn editor_state_eval(editor:&mut EditorState,
@@ -95,7 +137,8 @@ mod semantics {
 }
 
 pub mod io {
-    use super::{EditorState, EditCommand, Dir1D};
+    //use super::{EditorState, EditCommand, Dir1D};
+    use super::{EditorState, EditCommand};
     use sdl2::event::Event;
     use types::render;
 
@@ -132,8 +175,8 @@ pub mod io {
     ) -> Result<render::Elms, String>
     {
         let mut out : render::Elms = vec![];
-        use sdl2::rect::{Rect};
-        use sdl2::pixels::Color;
+        //use sdl2::rect::{Rect};
+        //use sdl2::pixels::Color;
 
         // todo
         Ok(vec![])

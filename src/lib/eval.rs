@@ -8,17 +8,17 @@ use super::types::{
 use sdl2::event::Event;
 pub fn consume_input(state: &mut State, event:Event) -> Result<Vec<Command>, ()> {
     debug!("{:?}", event);
-    match (&mut state.editor) {
-        (&mut Editor::Bitmap(ref ed)) => {
+    match &mut state.editor {
+        &mut Editor::Bitmap(ref ed) => {
             super::bitmap::io::consume_input(event)
                 .map(|ed_cmds|
                      ed_cmds.into_iter().map(|ed_cmd|
                                              Command::Bitmap(super::bitmap::Command::Edit(ed_cmd))).collect())
         },
-        (&mut Editor::Chain(ref mut ed)) => {
+        &mut Editor::Chain(ref mut ed) => {
             unimplemented!()
         }
-        (&mut Editor::Grid(ref mut ed)) => {
+        &mut Editor::Grid(ref mut ed) => {
             unimplemented!()
         }
     }

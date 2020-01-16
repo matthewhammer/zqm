@@ -15,8 +15,6 @@ we use Major mode for all glyph definitions here.
 
 */
 
-use types::{Name, util::*};
-use bitmap;
 mod cap5x5 {
     
 // capital letters and additional symbols
