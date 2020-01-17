@@ -159,7 +159,7 @@ pub mod semantics {
             Major::Row => bitmap.bits[x][y] = b,
             Major::Col => bitmap.bits[y][x] = b,
         };
-        trace!("bitmap_set_bit({}, {}, {})", x, y, b);
+        debug!("bitmap_set_bit({}, {}, {})", x, y, b);
     }
 
     pub fn bitmap_get_bit(bitmap:&Bitmap, x:usize, y:usize) -> bool {
@@ -178,7 +178,7 @@ pub mod semantics {
     pub fn bitmap_toggle_bit(bitmap:&mut Bitmap, x:usize, y:usize) -> bool {
         let b = bitmap_get_bit(bitmap, x, y);
         bitmap_set_bit(bitmap, x, y, !b);
-        trace!("bitmap_toggle_bit({}, {}) = {}", x, y, !b);
+        debug!("bitmap_toggle_bit({}, {}) = {}", x, y, !b);
         !b
     }
 
@@ -190,20 +190,20 @@ pub mod semantics {
     // 5. The failure error code could be a common error type (every possible error), or a trait param.
 
     pub fn bitmap_eval(bitmap:&mut Bitmap, command:&AutoCommand) -> Result<(), String> {
-        trace!("bitmap_eval {:?}", command);
+        debug!("bitmap_eval {:?}", command);
         let res = match command {
             &AutoCommand::ToggleBit(x, y) => { bitmap_toggle_bit(bitmap, x, y); }, // to do: actually return the bit.
             &AutoCommand::SetBit(x, y, b) => { bitmap_set_bit(bitmap, x, y, b); },
         };
         let res = Ok(res);
-        trace!("bitmap_eval {:?} ==> {:?}", command, res);
+        debug!("bitmap_eval {:?} ==> {:?}", command, res);
         res
     }
 
     pub fn editor_state_eval(editor:&mut EditorState,
                              command:&EditCommand) -> Result<(), String>
     {
-        trace!("editor_state_eval {:?}", command);
+        debug!("editor_state_eval {:?}", command);
         let res = match command {
             &EditCommand::MoveRel(ref dir) => {
                 let (w, h) = (editor.bitmap.width, editor.bitmap.height);
@@ -232,7 +232,7 @@ pub mod semantics {
                 Ok(())
             }
         };
-        trace!("editor_state_eval {:?} ==> {:?}", command, res);
+        debug!("editor_state_eval {:?} ==> {:?}", command, res);
         res
     }
 
@@ -267,7 +267,7 @@ pub mod semantics {
                 }
             }
         };
-        debug!("#{}: editor_eval {:?} ==> {:?}", num, command, res);
+        info!("#{}: editor_eval {:?} ==> {:?}", num, command, res);
         res
     }
 }

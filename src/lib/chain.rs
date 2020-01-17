@@ -34,6 +34,8 @@ impl Chain {
     pub fn insert_end(&mut self, media:Media) -> Unit { unimplemented!() }
     pub fn delete_end(&mut self) -> Res<Media> { unimplemented!() }
     pub fn replace(&mut self, name:Name, media:Media) -> Res<Media> { unimplemented!() }
+    pub fn replace_start(&mut self, media:Media) -> Res<Media> { unimplemented!() }
+    pub fn replace_end(&mut self, media:Media) -> Res<Media> { unimplemented!() }
     pub fn insert_after(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
     pub fn delete_after(&mut self, name:Name) -> Res<Media> { unimplemented!() }
     pub fn insert_before(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
@@ -46,11 +48,44 @@ pub enum AutoCommand {
     DeleteStart,
     InsertEnd(Media),
     DeleteEnd,
-    Replace(Name, Media),
     InsertAfter(Name, Media),
     DeleteAfter(Name),
     InsertBefore(Name, Media),
     DeleteBefore(Name),
+    Replace(Name, Media),
+    ReplaceStart(Media),
+    ReplaceEnd(Media),
+}
+
+use self::AutoCommand::*;
+
+impl AutoCommand {
+    fn is_insert(&self) -> bool {
+        match &self {
+            &InsertStart(_)  => true,
+            &InsertEnd(_)   => true,
+            &InsertAfter(_,_)  => true,
+            &InsertBefore(_,_)  => true,
+            _                 => false,
+        }
+    }
+    fn is_delete(&self) -> bool {
+        match &self {
+            &DeleteStart  => true,
+            &DeleteEnd   => true,
+            &DeleteAfter(_)  => true,
+            &DeleteBefore(_) => true,
+            _                  => false,
+        }
+    }
+    fn is_replace(&self) -> bool {
+        match &self {
+            &Replace(_,_) => true,
+            &ReplaceStart(_) => true,
+            &ReplaceEnd(_)  => true,
+            _                => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -87,8 +122,8 @@ pub enum Command {
     Init(InitCommand),
 
     /// commands that advance the state of the bitmap,
-    /// whose execution is independent of editor state
-    Auto(AutoCommand),
+    /// whose execution is independent of editor state, once we select a "direction".
+    Auto(Dir1D, AutoCommand),
 
     /// commands that advance the editor state,
     /// and possibly, its associated bitmap state
@@ -113,6 +148,8 @@ mod semantics {
             InsertEnd(ref m)   => none(chain.insert_end(m.clone())),
             DeleteEnd          => some(chain.delete_end()),
             Replace(ref n, ref m)      => some(chain.replace(n.clone(), m.clone())),
+            ReplaceStart(ref m)      => some(chain.replace_start(m.clone())),
+            ReplaceEnd(ref m)      => some(chain.replace_end(m.clone())),
             InsertAfter(ref n, ref m)  => none(chain.insert_after(n.clone(), m.clone())),
             DeleteAfter(ref n)         => some(chain.delete_after(n.clone())),
             InsertBefore(ref n, ref m) => none(chain.insert_before(n.clone(), m.clone())),

@@ -106,13 +106,15 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, ErrorKind, Write};
 
 pub fn load_state() -> State {
-    let file = match File::open(&get_persis_state_path()) {
+    let path = &get_persis_state_path();
+    let file = match File::open(path) {
         Ok(f) => f,
         Err(error) => match error.kind() {
             ErrorKind::NotFound => return init_state(),
             _ => unreachable!(),
         },
     };
+    info!("Loading from {:?}", path);
     let reader = BufReader::new(file);
     serde_json::from_reader(reader).unwrap()
 }

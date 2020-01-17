@@ -27,9 +27,15 @@ use zoom_quilt_maker::{eval, types};
 #[derive(StructOpt, Debug)]
 #[structopt(name="zqm",raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
 struct CliOpt {
-    /// Enable debug logging
-    #[structopt(short = "v", long = "verbose")]
-    verbose: bool,
+    /// Enable tracing -- the most verbose log.
+    #[structopt(short = "t", long = "trace-log")]
+    log_trace: bool,
+    /// Enable logging for debugging.
+    #[structopt(short = "d", long = "debug-log")]
+    log_debug: bool,
+    /// Disable most logging, if not explicitly enabled.
+    #[structopt(short = "q", long = "quiet-log")]
+    log_quiet: bool,
     #[structopt(subcommand)]
     command: CliCommand,
 }
@@ -39,6 +45,18 @@ enum CliCommand {
     #[structopt(name  = "start",
                 about = "Start interactively.")]
     Start,
+
+    #[structopt(name  = "resume",
+                about = "Resume last interaction.")]
+    Resume,
+
+    #[structopt(name  = "replay",
+                about = "Replay last interaction.")]
+    Replay,
+
+    #[structopt(name  = "history",
+                about = "Interact with history, the list of all prior interactions.")]
+    History,
 
     #[structopt(name  = "version",
                 about = "Display version.")]
@@ -51,17 +69,10 @@ enum CliCommand {
     },
 }
 
-fn init_log(verbose:bool) {
-    use log::LevelFilter;
+fn init_log(level_filter:log::LevelFilter) {
     use env_logger::{Builder, WriteStyle};
     let mut builder = Builder::new();
-    builder.filter(None,
-                   if verbose {
-                       LevelFilter::Trace
-                   }
-                   else {
-                       LevelFilter::Debug
-                   })
+    builder.filter(None, level_filter)
         .write_style(WriteStyle::Always)
         .init();
 }
@@ -124,11 +135,18 @@ pub fn do_event_loop(state: &mut types::State) -> Result<(), String> {
 
 fn main() {
     let cliopt  = CliOpt::from_args();
-    init_log(cliopt.verbose);
+    init_log(
+        match (cliopt.log_trace, cliopt.log_debug, cliopt.log_quiet) {
+            (true, _, _) => log::LevelFilter::Trace,
+            (_, true, _) => log::LevelFilter::Debug,
+            (_, _, true) => log::LevelFilter::Error,
+            (_, _,    _) => log::LevelFilter::Info,
+        }
+    );
 
     let mut state = eval::load_state();
 
-    info!("CLI command {:?}", &cliopt.command);
+    info!("Evaluating CLI command: {:?} ...", &cliopt.command);
 
     match cliopt.command {
         CliCommand::Version => {
@@ -144,6 +162,16 @@ fn main() {
         CliCommand::Start => {
             do_event_loop(&mut state).unwrap();
             eval::save_state(&state);
+        }
+        CliCommand::Resume => {
+            do_event_loop(&mut state).unwrap();
+            eval::save_state(&state);
+        }
+        CliCommand::Replay => {
+            unimplemented!()
+        }
+        CliCommand::History => {
+            unimplemented!()
         }
     }
 }
