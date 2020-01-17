@@ -190,19 +190,21 @@ pub mod semantics {
     // 5. The failure error code could be a common error type (every possible error), or a trait param.
 
     pub fn bitmap_eval(bitmap:&mut Bitmap, command:&AutoCommand) -> Result<(), String> {
-        trace!("bitmap_eval: {:?}", command);
-        match command {
-            &AutoCommand::ToggleBit(x, y) => { bitmap_toggle_bit(bitmap, x, y); },
+        trace!("bitmap_eval {:?}", command);
+        let res = match command {
+            &AutoCommand::ToggleBit(x, y) => { bitmap_toggle_bit(bitmap, x, y); }, // to do: actually return the bit.
             &AutoCommand::SetBit(x, y, b) => { bitmap_set_bit(bitmap, x, y, b); },
         };
-        Ok(())
+        let res = Ok(res);
+        trace!("bitmap_eval {:?} ==> {:?}", command, res);
+        res
     }
 
     pub fn editor_state_eval(editor:&mut EditorState,
                              command:&EditCommand) -> Result<(), String>
     {
-        trace!("editor_state_eval: {:?}", command);
-        match command {
+        trace!("editor_state_eval {:?}", command);
+        let res = match command {
             &EditCommand::MoveRel(ref dir) => {
                 let (w, h) = (editor.bitmap.width, editor.bitmap.height);
                 let (x, y) = editor.cursor;
@@ -229,15 +231,18 @@ pub mod semantics {
                 let _ = bitmap_toggle_bit(&mut editor.bitmap, x, y);
                 Ok(())
             }
-        }
+        };
+        trace!("editor_state_eval {:?} ==> {:?}", command, res);
+        res
     }
 
     pub fn editor_eval(editor:&mut Editor, command:&Command) -> Result<(), String> {
-        debug!("editor_eval(#{}): {:?}", editor.history.len(), command);
+        let num = editor.history.len();
+        debug!("#{}: editor_eval {:?}", num, command);
         // save the command in the history
         editor.history.push( command.clone() );
         // evaluate the command in the appropriate evaluation context:
-        match command {
+        let res = match command {
             &Command::Init(ref command) => {
                 editor.state = Some(EditorState{
                     bitmap: match command {
@@ -261,7 +266,9 @@ pub mod semantics {
                     Some(ref mut st) => editor_state_eval(st, &command),
                 }
             }
-        }
+        };
+        debug!("#{}: editor_eval {:?} ==> {:?}", num, command, res);
+        res
     }
 }
 
@@ -270,7 +277,7 @@ pub mod semantics {
 //
 // Define the IO for the Editor.  We use SDL for system-level IO on Mac/Linux.
 
-// TODO: We are going to use our own `render` elements (types::render::Elms) soon.
+// To do: We are going to use our own `render` elements (types::render::Elms) soon.
 
 pub mod io {
     use super::{EditorState, EditCommand, Dir2D};
