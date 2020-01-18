@@ -12,7 +12,7 @@ pub enum Chain {
 /// a node contains media, with an optional name.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node {
-    pub name: Option<Name>,
+    pub name: Name,
     pub media: Box<Media>,
 }
 
@@ -29,28 +29,28 @@ pub type Res<R> = Result<R, AutoError>;
 pub type Unit = Res<()>;
 
 impl Chain {
-    pub fn insert_start(&mut self, media:Media) -> Unit { unimplemented!() }
+    pub fn insert_start(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
     pub fn delete_start(&mut self) -> Res<Media> { unimplemented!() }
-    pub fn insert_end(&mut self, media:Media) -> Unit { unimplemented!() }
+    pub fn insert_end(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
     pub fn delete_end(&mut self) -> Res<Media> { unimplemented!() }
     pub fn replace(&mut self, name:Name, media:Media) -> Res<Media> { unimplemented!() }
     pub fn replace_start(&mut self, media:Media) -> Res<Media> { unimplemented!() }
     pub fn replace_end(&mut self, media:Media) -> Res<Media> { unimplemented!() }
-    pub fn insert_after(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
+    pub fn insert_after(&mut self, name:Name, name_new:Name, media:Media) -> Unit { unimplemented!() }
     pub fn delete_after(&mut self, name:Name) -> Res<Media> { unimplemented!() }
-    pub fn insert_before(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
+    pub fn insert_before(&mut self, name:Name, name_new:Name, media:Media) -> Unit { unimplemented!() }
     pub fn delete_before(&mut self, name:Name) -> Res<Media> { unimplemented!() }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AutoCommand {
-    InsertStart(Media),
+    InsertStart(Name, Media),
     DeleteStart,
-    InsertEnd(Media),
+    InsertEnd(Name, Media),
     DeleteEnd,
-    InsertAfter(Name, Media),
+    InsertAfter(Name, Name, Media),
     DeleteAfter(Name),
-    InsertBefore(Name, Media),
+    InsertBefore(Name, Name, Media),
     DeleteBefore(Name),
     Replace(Name, Media),
     ReplaceStart(Media),
@@ -62,10 +62,10 @@ use self::AutoCommand::*;
 impl AutoCommand {
     fn is_insert(&self) -> bool {
         match &self {
-            &InsertStart(_)  => true,
-            &InsertEnd(_)   => true,
-            &InsertAfter(_,_)  => true,
-            &InsertBefore(_,_)  => true,
+            &InsertStart(_,_)  => true,
+            &InsertEnd(_,_)   => true,
+            &InsertAfter(_,_,_)  => true,
+            &InsertBefore(_,_,_)  => true,
             _                 => false,
         }
     }
@@ -113,6 +113,9 @@ pub enum EditCommand {
     MoveAbs(usize),
     MoveBegin,
     MoveEnd,
+    Delete(Dir1D),
+    Insert(Dir1D, Name, Media),
+    Replace(Media),
 }
 
 /// commands that advance the evolution of a bitmap
@@ -143,16 +146,16 @@ mod semantics {
         pub fn some(r:Res<Media>) -> Res<Option<Media>> { r.map(|m| Some(m)) };
         pub fn none(r:Res<()>) -> Res<Option<Media>> { r.map(|_| None) };
         let res = match &command {
-            InsertStart(ref m) => none(chain.insert_start(m.clone())),
+            InsertStart(ref n, ref m) => none(chain.insert_start(n.clone(), m.clone())),
             DeleteStart        => some(chain.delete_start()),
-            InsertEnd(ref m)   => none(chain.insert_end(m.clone())),
+            InsertEnd(ref n, ref m)   => none(chain.insert_end(n.clone(), m.clone())),
             DeleteEnd          => some(chain.delete_end()),
             Replace(ref n, ref m)      => some(chain.replace(n.clone(), m.clone())),
             ReplaceStart(ref m)      => some(chain.replace_start(m.clone())),
             ReplaceEnd(ref m)      => some(chain.replace_end(m.clone())),
-            InsertAfter(ref n, ref m)  => none(chain.insert_after(n.clone(), m.clone())),
+            InsertAfter(ref n, ref nn, ref m)  => none(chain.insert_after(n.clone(), nn.clone(), m.clone())),
             DeleteAfter(ref n)         => some(chain.delete_after(n.clone())),
-            InsertBefore(ref n, ref m) => none(chain.insert_before(n.clone(), m.clone())),
+            InsertBefore(ref n, ref nn, ref m) => none(chain.insert_before(n.clone(), nn.clone(), m.clone())),
             DeleteBefore(ref n)        => some(chain.delete_before(n.clone())),
         };
         trace!("chain_eval {:?} ==> {:?}", command, res);

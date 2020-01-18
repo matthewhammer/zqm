@@ -1,3 +1,5 @@
+// rename this module to 'engine'?
+
 use super::types::{
     State,
     Editor,
@@ -10,6 +12,8 @@ pub fn commands_of_event(state: &mut State, event:&Event) -> Result<Vec<Command>
     debug!("commands_of_event {:?}", &event);
     let res = match &mut state.editor {
         &mut Editor::Bitmap(ref ed) => {
+            // to do -- insert a name into each command that is unique,
+            // but whose structure encodes a wallclock timestamp, among other sequence numbers.
             super::bitmap::io::consume_input(event)
                 .map(|ed_cmds|
                      ed_cmds.into_iter().map(|ed_cmd|

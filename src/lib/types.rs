@@ -5,7 +5,8 @@
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
 
-/// a grid of bits, represented as a 2D array
+/// Media combines words and images
+/// (eventually, we add sound and moving images)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Media {
     Void,
