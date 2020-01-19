@@ -4,6 +4,7 @@
 
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 
 /// Media combines words and images
 /// (eventually, we add sound and moving images)
@@ -22,18 +23,21 @@ pub enum Media {
     StoreProj(Store, Name),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Store {
-    pub name: Rc<Name>,
+    //pub name: Rc<Name>,
+    pub name: Name,
     // finite map from names to StoreRecords    
     // will be shared, non-linearly, by each associated StoreProj
     // representation to use hash-consing for O(1) clones and O(1) serialize
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StoreRecord {
-    pub name: Rc<Name>,
-    pub content: Rc<Media>,
+    //pub name: Rc<Name>,
+    //pub content: Rc<Media>,
+    pub name: Name,
+    pub content: Media,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -122,11 +126,16 @@ pub mod render {
     }
     pub struct Node {
         pub rect: Rect,
+        pub fill: Fill,
         pub children: Elms,
     }
+    pub enum Fill {
+        Open(Color, usize), // border width
+        Closed(Color),
+        None,
+    }
     pub enum Elm {
-        FillRect(Rect, Color),
-        OpenRect(Rect, Color),
+        Rect(Rect, Fill),
         Node(Box<Node>)
     }
     pub type Elms = Vec<Elm>;
