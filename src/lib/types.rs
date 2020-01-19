@@ -18,6 +18,22 @@ pub enum Media {
     Bitmap(Box<super::bitmap::Bitmap>),
     Chain(Box<super::chain::Chain>),
     Grid(Box<super::grid::Grid>),
+    Store(Store),
+    StoreProj(Store, Name),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Store {
+    pub name: Rc<Name>,
+    // finite map from names to StoreRecords    
+    // will be shared, non-linearly, by each associated StoreProj
+    // representation to use hash-consing for O(1) clones and O(1) serialize
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StoreRecord {
+    pub name: Rc<Name>,
+    pub content: Rc<Media>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

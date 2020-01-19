@@ -30,31 +30,35 @@ pub type Unit = Res<()>;
 
 impl Chain {
     pub fn insert_start(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
-    pub fn delete_start(&mut self) -> Res<Media> { unimplemented!() }
     pub fn insert_end(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
-    pub fn delete_end(&mut self) -> Res<Media> { unimplemented!() }
-    pub fn replace(&mut self, name:Name, media:Media) -> Res<Media> { unimplemented!() }
-    pub fn replace_start(&mut self, media:Media) -> Res<Media> { unimplemented!() }
-    pub fn replace_end(&mut self, media:Media) -> Res<Media> { unimplemented!() }
     pub fn insert_after(&mut self, name:Name, name_new:Name, media:Media) -> Unit { unimplemented!() }
-    pub fn delete_after(&mut self, name:Name) -> Res<Media> { unimplemented!() }
     pub fn insert_before(&mut self, name:Name, name_new:Name, media:Media) -> Unit { unimplemented!() }
+
+    pub fn delete_start(&mut self) -> Res<Media> { unimplemented!() }
+    pub fn delete_end(&mut self) -> Res<Media> { unimplemented!() }
+    pub fn delete_after(&mut self, name:Name) -> Res<Media> { unimplemented!() }
     pub fn delete_before(&mut self, name:Name) -> Res<Media> { unimplemented!() }
+
+    pub fn replace_start(&mut self, media:Media) -> Res<Media> { unimplemented!() }
+    pub fn replace_end(&mut self, media:Media) -> Res<Media> { unimplemented!() }    
+    pub fn replace(&mut self, name:Name, media:Media) -> Res<Media> { unimplemented!() }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AutoCommand {
     InsertStart(Name, Media),
-    DeleteStart,
     InsertEnd(Name, Media),
-    DeleteEnd,
-    InsertAfter(Name, Name, Media),
-    DeleteAfter(Name),
     InsertBefore(Name, Name, Media),
+    InsertAfter(Name, Name, Media),
+    
+    DeleteStart,
+    DeleteEnd,
+    DeleteAfter(Name),
     DeleteBefore(Name),
+
     Replace(Name, Media),
-    ReplaceStart(Media),
     ReplaceEnd(Media),
+    ReplaceStart(Media),
 }
 
 use self::AutoCommand::*;
@@ -113,8 +117,8 @@ pub enum EditCommand {
     MoveAbs(usize),
     MoveBegin,
     MoveEnd,
-    Delete(Dir1D),
     Insert(Dir1D, Name, Media),
+    Delete(Dir1D),
     Replace(Media),
 }
 

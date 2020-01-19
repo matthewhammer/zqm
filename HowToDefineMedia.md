@@ -1,4 +1,4 @@
-#### MAH/zqm -- 2020-01-13 @ Wonderland Hill; Boulder, CO.
+#### MAH/zqm -- 2020-01-13
 
 # How to define a ZQM Media mode
 
