@@ -27,7 +27,7 @@ pub enum Media {
 pub struct Store {
     //pub name: Rc<Name>,
     pub name: Name,
-    // finite map from names to StoreRecords    
+    // finite map from names to StoreRecords
     // will be shared, non-linearly, by each associated StoreProj
     // representation to use hash-consing for O(1) clones and O(1) serialize
 }
@@ -106,6 +106,109 @@ pub struct Location {
 }
 
 
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// See design/AdaptonDesign.md for details.
+
+pub mod adapton {
+    use serde::{Deserialize, Serialize};
+    use super::{Name, Media, Command};
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    /// media-naming environments
+    pub struct Env {
+        pub bindings:Vec<(Name, Media)>
+    }
+    /// media-producing expressions as command lists
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Exp {
+        pub commands:Vec<(Name, Command)>
+    }
+    /// media-producing closures as closed command lists
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Closure {
+        pub env: Env,
+        pub exp: Exp,
+    }
+
+    /// Ref nodes define the "loci of data change" within the DCG;
+    /// when observed by a thunk node, they record the dependent as a new `incoming` edge.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Ref {
+        pub content: Media,
+        // aka, dependents that depend on this node
+        pub incoming: Vec<Edge>,
+    }
+    /// Thunk nodes define the "loci of demand change" within the DCG;
+    /// when observed, they perform actions each recorded as an `outgoing` edge.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Thunk {
+        pub closure: Closure,
+        pub result: Option<Media>,
+        // aka, dependencies upon which this node depends
+        pub outgoing: Vec<Edge>,
+        // aka, dependents that depend on this node
+        pub incoming: Vec<Edge>,
+    }
+    /// Each edge relates two nodes, the first of which is always a
+    /// (demanded) thunk; the edge records a single action performed
+    /// by this thunk.  Later, the edge can be dirtied as a by-product of
+    /// future actions to the source of the edge, or its transitive dependencies.
+    /// Dirty edges cannot be reused via memoization.
+    /// Invariant: not(dirty_flag) implies checkpoint is consistent, transitively.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Edge {
+        /// edge source; subject of the action along edge
+        pub dependent: NodeId,
+        /// edge target; object of the action along edge
+        pub dependency: NodeId,
+        /// save a checkpoint of the action along edge
+        pub checkpoint: Action,
+        /// not(dirty_flag) implies checkpoint is consistent, transitively
+        pub dirty_flag: bool,
+    }
+    /// The data associated with an action as required by an edge's checkpoint of that action
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub enum Action {
+        /// allocate/overwrite a ref node with given media
+        Set(Media),
+        /// allocate/overwrite a thunk node with the given media-producing closure
+        Thunk(Closure),
+        /// demand/observe the media content of a ref/thunk node
+        Get(Media),
+    }
+    /// The public type exposed by ref and thunk allocation
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct NodeId {
+        pub name: Name
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub enum Node {
+        Ref(Ref),
+        Thunk(Thunk),
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct Context {
+
+    }
+    impl Context {
+        fn enter_scope(name:Name) {
+            unimplemented!()
+        }
+        fn leave_scope() {
+            unimplemented!()
+        }
+        fn thunk(name:Option<Name>, closure:Closure) -> NodeId {
+            unimplemented!()
+        }
+        fn set(name:Option<Name>, media:Media) -> NodeId {
+            unimplemented!()
+        }
+        fn get(name:Name, node:NodeId) {
+            unimplemented!()
+        }
+    }
+}
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
