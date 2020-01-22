@@ -14,13 +14,13 @@ pub enum Media {
     Atom(Atom),
     Name(Name),
     Location(Location),
-    Named(Name, Box<Media>),
-    Located(Location, Box<Media>),
     Bitmap(Box<super::bitmap::Bitmap>),
     Chain(Box<super::chain::Chain>),
     Grid(Box<super::grid::Grid>),
     Store(Store),
     StoreProj(Store, Name),
+    Named(Name, Box<Media>),
+    Located(Location, Box<Media>),
 }
 
 /// We lift Media to an expression language, with media operations, and adapton operations
@@ -30,20 +30,20 @@ pub enum Exp {
     Atom(Atom),
     Name(Name),
     Location(Location),
-    Named(Name, Box<Exp>),
-    Located(Location, Box<Exp>),
     Bitmap(Box<super::bitmap::Bitmap>),
     Chain(Box<super::chain::Chain>),
     Grid(Box<super::grid::Grid>),
     Store(Store),
     StoreProj(Box<Exp>, Name),
+    Named(Name, Box<Exp>),
+    Located(Location, Box<Exp>),
     //----------------------------------------------------------------
     // Media forms above; More expression forms below:
     //----------------------------------------------------------------
-    Block(Block),
-    Var(Name),
     StoreFrom(Name, Box<Exp>),
     Command(Command),
+    Block(Block),
+    Var(Name),
     //----------------------------------------------------------------
     // Adapton primitives (for the "demanded computation graph", DCG):
     //----------------------------------------------------------------
