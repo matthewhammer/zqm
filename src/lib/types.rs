@@ -41,6 +41,7 @@ pub enum Exp {
     // Media forms above; More expression forms below:
     //----------------------------------------------------------------
     Block(Block),
+    Var(Name),
     StoreFrom(Name, Box<Exp>),
     Command(Command),
     //----------------------------------------------------------------
@@ -48,7 +49,7 @@ pub enum Exp {
     //----------------------------------------------------------------
     Put(Name, Box<Exp>),
     Thunk(Name, Vec<(Name, Exp)>),
-    Get(adapton::NodeId),
+    Get(Box<Exp>),
 }
 
 /// an expression block consists of a sequence of bindings
