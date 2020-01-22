@@ -1,5 +1,6 @@
 // SDL: Keyboard/mouse input events, multi-media output abstractions:
 extern crate sdl2;
+extern crate hashcons;
 
 // Logging:
 #[macro_use] extern crate log;

@@ -23,6 +23,30 @@ pub enum Media {
     StoreProj(Store, Name),
 }
 
+/// We lift Media to an expression language, with media operations, and adapton operations
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Exp {
+    Void,
+    Atom(Atom),
+    Name(Name),
+    Location(Location),
+    Named(Name, Box<Exp>),
+    Located(Location, Box<Exp>),
+    Bitmap(Box<super::bitmap::Bitmap>),
+    Chain(Box<super::chain::Chain>),
+    Grid(Box<super::grid::Grid>),
+    Store(Store),
+    StoreProj(Box<Exp>, Name),
+    //----------------------------------------------------------------
+    // Media forms above ; Commands, Media & Adapton operations below
+    //----------------------------------------------------------------
+    StoreFrom(Name, Box<Exp>),
+    Command(Command),
+    Put(Name, Box<Exp>),
+    Thunk(Name, Vec<(Name, Exp)>),
+    Get(adapton::NodeId),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Store {
     //pub name: Rc<Name>,
@@ -30,6 +54,8 @@ pub struct Store {
     // finite map from names to StoreRecords
     // will be shared, non-linearly, by each associated StoreProj
     // representation to use hash-consing for O(1) clones and O(1) serialize
+
+    // todo: use hashcons crate for this
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -171,7 +197,7 @@ pub mod adapton {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Action {
         /// allocate/overwrite a ref node with given media
-        Set(Media),
+        Put(Media),
         /// allocate/overwrite a thunk node with the given media-producing closure
         Thunk(Closure),
         /// demand/observe the media content of a ref/thunk node
