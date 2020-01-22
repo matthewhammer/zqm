@@ -38,11 +38,14 @@ pub enum Exp {
     Store(Store),
     StoreProj(Box<Exp>, Name),
     //----------------------------------------------------------------
-    // Media forms above ; Commands, Media & Adapton operations below
+    // Media forms above; More expression forms below:
     //----------------------------------------------------------------
+    Block(Block),
     StoreFrom(Name, Box<Exp>),
     Command(Command),
-    Block(Block),
+    //----------------------------------------------------------------
+    // Adapton primitives (for the "demanded computation graph", DCG):
+    //----------------------------------------------------------------
     Put(Name, Box<Exp>),
     Thunk(Name, Vec<(Name, Exp)>),
     Get(adapton::NodeId),
