@@ -42,9 +42,16 @@ pub enum Exp {
     //----------------------------------------------------------------
     StoreFrom(Name, Box<Exp>),
     Command(Command),
+    Block(Block),
     Put(Name, Box<Exp>),
     Thunk(Name, Vec<(Name, Exp)>),
     Get(adapton::NodeId),
+}
+
+/// an expression block consists of a sequence of bindings
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Block {
+    pub bindings: Vec<(Name, Exp)>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -73,6 +80,8 @@ pub enum Editor {
     Grid(Box<super::grid::Editor>),
 }
 
+// to do -- eventually, we may want these to be "open" wrt the exp environment;
+// for expressing scripts, etc; then we'd need to do substitution, or more env-passing, or both.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Command {
     Bitmap(super::bitmap::Command),
@@ -138,35 +147,30 @@ pub struct Location {
 
 pub mod adapton {
     use serde::{Deserialize, Serialize};
-    use super::{Name, Media, Command};
+    use super::{Name, Media, Command, Exp};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     /// media-naming environments
     pub struct Env {
         pub bindings:Vec<(Name, Media)>
     }
-    /// media-producing expressions as command lists
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct Exp {
-        pub commands:Vec<(Name, Command)>
-    }
-    /// media-producing closures as closed command lists
+    /// media-producing closures
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Closure {
         pub env: Env,
         pub exp: Exp,
     }
-
-    /// Ref nodes define the "loci of data change" within the DCG;
-    /// when observed by a thunk node, they record the dependent as a new `incoming` edge.
+    /// a Ref node names a "locus of changing data" within the DCG;
+    /// when observed by a thunk node, it records this dependent as a new `incoming` edge.
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Ref {
         pub content: Media,
         // aka, dependents that depend on this node
         pub incoming: Vec<Edge>,
     }
-    /// Thunk nodes define the "loci of demand change" within the DCG;
-    /// when observed, they perform actions each recorded as an `outgoing` edge.
+    /// a Thunk node defines a "locus of changing demand & control" within the DCG;
+    /// when observed, it performs actions on other nodes, 
+    /// each recorded as an `outgoing` edge on its dependency, another node.
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Thunk {
         pub closure: Closure,
