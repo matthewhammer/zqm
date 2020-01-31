@@ -15,7 +15,7 @@ we use Major mode for all glyph definitions here.
 
 */
 
-mod cap5x5 {
+pub mod cap5x5 {
 
     // capital letters and additional symbols
     //

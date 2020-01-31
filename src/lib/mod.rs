@@ -12,6 +12,8 @@ extern crate hashcons;
 #[macro_use]
 pub mod macros;
 
+pub mod adapton;
+
 pub type Glyph = bitmap::Bitmap;
 pub type GlyphMap = std::collections::HashMap<types::Name, Glyph>;
 

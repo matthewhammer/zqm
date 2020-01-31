@@ -5,9 +5,7 @@
 // Serde: Persistent state between invocations of ZQM
 use hashcons::merkle::Merkle;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
-pub type Shared<X> = Merkle<X>;
+//use std::collections::HashMap;
 
 /// Media combines words and images
 /// (eventually, we add sound and moving images)
@@ -151,7 +149,8 @@ pub struct Location {
 // See design/AdaptonDesign.md for details.
 
 pub mod adapton {
-    use super::{Command, Exp, Media, Name};
+    use crate::adapton;
+    use super::{Exp, Media, Name};
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
@@ -225,20 +224,20 @@ pub mod adapton {
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Context {}
     impl Context {
-        fn enter_scope(name: Name) {
-            unimplemented!()
+        pub fn enter_scope(&mut self, name: Name) {
+            adapton::enter_scope(self, name)
         }
-        fn leave_scope() {
-            unimplemented!()
+        pub fn leave_scope(&mut self) {
+            adapton::leave_scope(self)
         }
-        fn thunk(name: Option<Name>, closure: Closure) -> NodeId {
-            unimplemented!()
+        pub fn thunk(&mut self, name: Option<Name>, closure: Closure) -> NodeId {
+            adapton::thunk(self, name, closure)
         }
-        fn set(name: Option<Name>, media: Media) -> NodeId {
-            unimplemented!()
+        pub fn set(&mut self, name: Option<Name>, media: Media) -> NodeId {
+            adapton::set(self, name, media)
         }
-        fn get(name: Name, node: NodeId) {
-            unimplemented!()
+        pub fn get(&mut self, name: Name, node: NodeId) {
+            adapton::get(self, name, node)
         }
     }
 }

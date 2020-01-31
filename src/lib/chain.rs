@@ -86,7 +86,7 @@ pub enum AutoCommand {
 use self::AutoCommand::*;
 
 impl AutoCommand {
-    fn is_insert(&self) -> bool {
+    pub fn is_insert(&self) -> bool {
         match &self {
             &InsertStart(_, _) => true,
             &InsertEnd(_, _) => true,
@@ -95,7 +95,7 @@ impl AutoCommand {
             _ => false,
         }
     }
-    fn is_delete(&self) -> bool {
+    pub fn is_delete(&self) -> bool {
         match &self {
             &DeleteStart => true,
             &DeleteEnd => true,
@@ -104,7 +104,7 @@ impl AutoCommand {
             _ => false,
         }
     }
-    fn is_replace(&self) -> bool {
+    pub fn is_replace(&self) -> bool {
         match &self {
             &Replace(_, _) => true,
             &ReplaceStart(_) => true,
@@ -159,9 +159,10 @@ pub enum Command {
     Edit(EditCommand),
 }
 
-mod semantics {
+pub mod semantics {
     //use super::{Chain, Command, AutoCommand, EditCommand, InitCommand, Editor, EditorState};
     use super::{AutoCommand, Chain, Command, EditCommand, EditorState, Media, Res};
+    use glyph::cap5x5::glyph_map;
 
     // todo -- if we instead assume a moved Command rather than a borrowed one, we avoid clone()s here?
     //         OTOH, if we use a borrow, the Command constructors are affine too, which can be annoying, esp for logging.
@@ -175,6 +176,7 @@ mod semantics {
         pub fn none(r: Res<()>) -> Res<Option<Media>> {
             r.map(|_| None)
         };
+        let _gm = glyph_map();
         let res = match &command {
             InsertStart(ref n, ref m) => none(chain.insert_start(n.clone(), m.clone())),
             DeleteStart => some(chain.delete_start()),
@@ -246,11 +248,11 @@ pub mod io {
         canvas: &mut Canvas<T>,
         edit_state: &EditorState,
     ) -> Result<render::Elms, String> {
-        let mut out: render::Elms = vec![];
+        let out: render::Elms = vec![];
         //use sdl2::rect::{Rect};
         //use sdl2::pixels::Color;
 
         // todo
-        Ok(vec![])
+        Ok(out)
     }
 }

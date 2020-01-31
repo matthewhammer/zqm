@@ -311,7 +311,7 @@ pub mod io {
         canvas: &mut Canvas<T>,
         edit_state: &EditorState,
     ) -> Result<render::Elms, String> {
-        let mut out: render::Elms = vec![];
+        let out: render::Elms = vec![];
         use sdl2::pixels::Color;
         use sdl2::rect::Rect;
 
@@ -373,6 +373,6 @@ pub mod io {
         }
         canvas.present();
         // todo
-        Ok(vec![])
+        Ok(out)
     }
 }

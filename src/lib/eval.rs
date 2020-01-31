@@ -55,7 +55,13 @@ pub fn init_state() -> State {
     let init_command = Command::Bitmap(super::bitmap::Command::Init(
         super::bitmap::InitCommand::Make16x16,
     ));
-    command_eval(&mut state_init, &init_command);
+    let r = command_eval(&mut state_init, &init_command);
+    match r {
+        Ok(()) => { },
+        Err(err) => {
+            eprintln!("Failed to initialize bitmap editor: {:?}", err)
+        }
+    };
     state_init
 }
 
