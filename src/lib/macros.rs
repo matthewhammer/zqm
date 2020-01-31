@@ -32,7 +32,7 @@ macro_rules! parse_glyph_map {
             let mut map = crate::std::collections::HashMap::new();
             $(
                 {
-                    let name  : crate::types::Name = parse_name!( $glyph_name );
+                    let name  : crate::types::lang::Name = parse_name!( $glyph_name );
                     let glyph : crate::Glyph = parse_glyph!( $glyph_value );
                     map.insert(name, glyph);
                 }

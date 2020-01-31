@@ -1,7 +1,7 @@
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
 
-use types::{Dir2D, Nat};
+use types::lang::{Dir2D, Nat};
 
 // Step 1:
 // -------

@@ -78,7 +78,7 @@ fn init_log(level_filter: log::LevelFilter) {
         .init();
 }
 
-pub fn do_event_loop(state: &mut types::State) -> Result<(), String> {
+pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     use sdl2::event::EventType;
     //use sdl2::keyboard::Keycode;
 

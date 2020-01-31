@@ -1,6 +1,6 @@
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
-use types::{Dir1D, Media, Name};
+use types::lang::{Dir1D, Media, Name};
 
 /// a chain is an affine linked-list of nodes, each with optionally-named media.
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]

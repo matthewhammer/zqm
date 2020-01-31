@@ -1,156 +1,160 @@
-// Note: Using Box<_> in places where I might like Rc<_>;
-//       Serde does not work for Rc<_> out of the box
-//       Same issue for HashMap<_> uses here.
+/// The ZQM language: abstract syntax
+pub mod lang {
+    use crate::{bitmap, chain, grid};
+    use hashcons::merkle::Merkle;
+    use serde::{Deserialize, Serialize};
 
-// Serde: Persistent state between invocations of ZQM
-use hashcons::merkle::Merkle;
-use serde::{Deserialize, Serialize};
-//use std::collections::HashMap;
+    /// Media combines words and images
+    /// (eventually, we add sound and moving images)
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub enum Media {
+        Void,
+        Atom(Atom),
+        Name(Name),
+        Location(Location),
+        Bitmap(Box<bitmap::Bitmap>),
+        Chain(Box<chain::Chain>),
+        Grid(Box<grid::Grid>),
+        Store(Store),
+        StoreProj(Store, Name),
+        Named(Name, Box<Media>),
+        Located(Location, Box<Media>),
+        Merkle(Merkle<Media>),
+    }
 
-/// Media combines words and images
-/// (eventually, we add sound and moving images)
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub enum Media {
-    Void,
-    Atom(Atom),
-    Name(Name),
-    Location(Location),
-    Bitmap(Box<super::bitmap::Bitmap>),
-    Chain(Box<super::chain::Chain>),
-    Grid(Box<super::grid::Grid>),
-    Store(Store),
-    StoreProj(Store, Name),
-    Named(Name, Box<Media>),
-    Located(Location, Box<Media>),
-    Merkle(Merkle<Media>),
-}
+    /// We lift Media to an expression language, with media operations, and adapton operations
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub enum Exp {
+        //----------------------------------------------------------------
+        // Media forms (think "data values" in the PL sense):
+        //----------------------------------------------------------------
+        Void,
+        Atom(Atom),
+        Name(Name),
+        Location(Location),
+        Bitmap(Box<bitmap::Bitmap>),
+        Chain(Box<chain::Chain>),
+        Grid(Box<grid::Grid>),
+        Store(Store),
+        StoreProj(Box<Exp>, Name),
+        Named(Name, Box<Exp>),
+        Located(Location, Box<Exp>),
+        Merkle(Merkle<Exp>),
+        //----------------------------------------------------------------
+        // Expression forms (whose evaluation produces Media):
+        //----------------------------------------------------------------
+        MerkleFrom(Box<Exp>),
+        StoreFrom(Name, Box<Exp>),
+        Command(Command),
+        Block(Block),
+        Var(Name),
+        //----------------------------------------------------------------
+        // Adapton primitives (for the "demanded computation graph", DCG):
+        //----------------------------------------------------------------
+        Put(Name, Box<Exp>),
+        Thunk(Name, Vec<(Name, Exp)>),
+        Get(Box<Exp>),
+    }
 
-/// We lift Media to an expression language, with media operations, and adapton operations
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub enum Exp {
-    //----------------------------------------------------------------
-    // Media forms (think "data values" in the PL sense):
-    //----------------------------------------------------------------
-    Void,
-    Atom(Atom),
-    Name(Name),
-    Location(Location),
-    Bitmap(Box<super::bitmap::Bitmap>),
-    Chain(Box<super::chain::Chain>),
-    Grid(Box<super::grid::Grid>),
-    Store(Store),
-    StoreProj(Box<Exp>, Name),
-    Named(Name, Box<Exp>),
-    Located(Location, Box<Exp>),
-    Merkle(Merkle<Exp>),
-    //----------------------------------------------------------------
-    // Expression forms (whose evaluation produces Media):
-    //----------------------------------------------------------------
-    MerkleFrom(Box<Exp>),
-    StoreFrom(Name, Box<Exp>),
-    Command(Command),
-    Block(Block),
-    Var(Name),
-    //----------------------------------------------------------------
-    // Adapton primitives (for the "demanded computation graph", DCG):
-    //----------------------------------------------------------------
-    Put(Name, Box<Exp>),
-    Thunk(Name, Vec<(Name, Exp)>),
-    Get(Box<Exp>),
-}
+    /// The data result produced by running a command
+    pub type Result = std::result::Result<Media, Error>;
 
-/// an expression block consists of a sequence of bindings
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct Block {
-    pub bindings: Vec<(Name, Exp)>,
-}
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub enum Error {}
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct Store {
-    //pub name: Rc<Name>,
-    pub name: Merkle<Name>,
-    // finite map from names to StoreRecords
-    // will be shared, non-linearly, by each associated StoreProj
-    // representation to use hash-consing for O(1) clones and O(1) serialize
-    pub table: Vec<(Merkle<Name>, Merkle<Media>)>, // todo: use hashcons crate for this
-}
+    /// an expression block consists of a sequence of bindings
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub struct Block {
+        pub bindings: Vec<(Name, Exp)>,
+    }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct StoreRecord {
-    //pub name: Rc<Name>,
-    //pub content: Rc<Media>,
-    pub name: Name,
-    pub content: Media,
-}
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub struct Store {
+        //pub name: Rc<Name>,
+        pub name: Merkle<Name>,
+        // finite map from names to StoreRecords
+        // will be shared, non-linearly, by each associated StoreProj
+        // representation to use hash-consing for O(1) clones and O(1) serialize
+        pub table: Vec<(Merkle<Name>, Merkle<Media>)>, // todo: use hashcons crate for this
+    }
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
-pub enum Editor {
-    Bitmap(Box<super::bitmap::Editor>),
-    Chain(Box<super::chain::Editor>),
-    Grid(Box<super::grid::Editor>),
-}
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub struct StoreRecord {
+        //pub name: Rc<Name>,
+        //pub content: Rc<Media>,
+        pub name: Name,
+        pub content: Media,
+    }
 
-// to do -- eventually, we may want these to be "open" wrt the exp environment;
-// for expressing scripts, etc; then we'd need to do substitution, or more env-passing, or both.
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-pub enum Command {
-    Bitmap(super::bitmap::Command),
-    Chain(super::chain::Command),
-    Grid(super::grid::Command),
-}
+    #[derive(Debug, Serialize, Deserialize, Hash)]
+    pub enum Editor {
+        Bitmap(Box<bitmap::Editor>),
+        Chain(Box<chain::Editor>),
+        Grid(Box<grid::Editor>),
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-pub enum Dir1D {
-    Forward,
-    Backward,
-}
+    // to do -- eventually, we may want these to be "open" wrt the exp environment;
+    // for expressing scripts, etc; then we'd need to do substitution, or more env-passing, or both.
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+    pub enum Command {
+        Bitmap(bitmap::Command),
+        Chain(chain::Command),
+        Grid(grid::Command),
+    }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-pub enum Dir2D {
-    Up,
-    Down,
-    Left,
-    Right,
-}
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+    pub enum Dir1D {
+        Forward,
+        Backward,
+    }
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
-pub struct State {
-    pub editor: Editor,
-}
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+    pub enum Dir2D {
+        Up,
+        Down,
+        Left,
+        Right,
+    }
 
-pub type Hash = u64;
-pub type Nat = usize;
+    #[derive(Debug, Serialize, Deserialize, Hash)]
+    pub struct State {
+        pub editor: Editor,
+    }
 
-pub type Map<X, Y> = std::collections::HashMap<X, Y>;
+    pub type Hash = u64;
+    pub type Nat = usize;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum Name {
-    Atom(Atom),
-    Option(Option<Box<Name>>),
-    TaggedTuple(Box<Name>, Vec<Name>),
-    Merkle(Merkle<Name>),
-}
+    pub type Map<X, Y> = std::collections::HashMap<X, Y>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum Atom {
-    Bool(bool),
-    Usize(usize),
-    String(String),
-    // Eventually(as of 2020-01-04): Permit Media to name Media.
-}
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+    pub enum Name {
+        Atom(Atom),
+        Option(Option<Box<Name>>),
+        TaggedTuple(Box<Name>, Vec<Name>),
+        Merkle(Merkle<Name>),
+    }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct Location {
-    pub time: Name,
-    pub place: Name,
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+    pub enum Atom {
+        Bool(bool),
+        Usize(usize),
+        String(String),
+        // Eventually(as of 2020-01-04): Permit Media to name Media.
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub struct Location {
+        pub time: Name,
+        pub place: Name,
+    }
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // See design/AdaptonDesign.md for details.
 
 pub mod adapton {
+    use super::lang::{Exp, Media, Name, Result as EvalResult};
     use crate::adapton;
-    use super::{Exp, Media, Name};
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
@@ -178,7 +182,7 @@ pub mod adapton {
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Thunk {
         pub closure: Closure,
-        pub result: Option<Media>,
+        pub result: Option<EvalResult>,
         // aka, dependencies upon which this node depends
         pub outgoing: Vec<Edge>,
         // aka, dependents that depend on this node
@@ -230,13 +234,21 @@ pub mod adapton {
         pub fn leave_scope(&mut self) {
             adapton::leave_scope(self)
         }
-        pub fn thunk(&mut self, name: Option<Name>, closure: Closure) -> NodeId {
-            adapton::thunk(self, name, closure)
+        pub fn put_thunk(
+            &mut self,
+            name: Option<Name>,
+            closure: Closure,
+        ) -> Result<NodeId, adapton::PutError> {
+            adapton::put_thunk(self, name, closure)
         }
-        pub fn set(&mut self, name: Option<Name>, media: Media) -> NodeId {
-            adapton::set(self, name, media)
+        pub fn put(
+            &mut self,
+            name: Option<Name>,
+            media: Media,
+        ) -> Result<NodeId, adapton::PutError> {
+            adapton::put(self, name, media)
         }
-        pub fn get(&mut self, name: Name, node: NodeId) {
+        pub fn get(&mut self, name: Name, node: NodeId) -> Result<EvalResult, adapton::GetError> {
             adapton::get(self, name, node)
         }
     }
@@ -277,7 +289,7 @@ pub mod render {
 }
 
 pub mod util {
-    use super::*;
+    use super::lang::{Atom, Name};
 
     /*
     pub fn namefn_id() -> NameFn {

@@ -1,6 +1,9 @@
 // rename this module to 'engine'?
 
-use super::types::{render, Command, Editor, State};
+use super::types::{
+    lang::{Command, Editor, State},
+    render,
+};
 
 use sdl2::event::Event;
 pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command>, ()> {
@@ -47,20 +50,18 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
 // - OS filesystem paths for archiving
 pub fn init_state() -> State {
     let mut state_init = State {
-        editor: super::types::Editor::Bitmap(Box::new(super::bitmap::Editor {
+        editor: super::types::lang::Editor::Bitmap(Box::new(crate::bitmap::Editor {
             state: None,
             history: vec![],
         })),
     };
-    let init_command = Command::Bitmap(super::bitmap::Command::Init(
-        super::bitmap::InitCommand::Make16x16,
+    let init_command = Command::Bitmap(crate::bitmap::Command::Init(
+        crate::bitmap::InitCommand::Make16x16,
     ));
     let r = command_eval(&mut state_init, &init_command);
     match r {
-        Ok(()) => { },
-        Err(err) => {
-            eprintln!("Failed to initialize bitmap editor: {:?}", err)
-        }
+        Ok(()) => {}
+        Err(err) => eprintln!("Failed to initialize bitmap editor: {:?}", err),
     };
     state_init
 }

@@ -15,7 +15,7 @@ pub mod macros;
 pub mod adapton;
 
 pub type Glyph = bitmap::Bitmap;
-pub type GlyphMap = std::collections::HashMap<types::Name, Glyph>;
+pub type GlyphMap = std::collections::HashMap<types::lang::Name, Glyph>;
 
 pub mod chain;
 pub mod grid;
