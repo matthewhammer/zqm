@@ -3,8 +3,8 @@
 //       Same issue for HashMap<_> uses here.
 
 // Serde: Persistent state between invocations of ZQM
-use serde::{Deserialize, Serialize};
 use hashcons::merkle::Merkle;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub type Shared<X> = Merkle<X>;
@@ -64,7 +64,7 @@ pub enum Exp {
 /// an expression block consists of a sequence of bindings
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Block {
-    pub bindings: Vec<(Name, Exp)>
+    pub bindings: Vec<(Name, Exp)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -74,8 +74,7 @@ pub struct Store {
     // finite map from names to StoreRecords
     // will be shared, non-linearly, by each associated StoreProj
     // representation to use hash-consing for O(1) clones and O(1) serialize
-    pub table: Vec<(Merkle<Name>, Merkle<Media>)>
-    // todo: use hashcons crate for this
+    pub table: Vec<(Merkle<Name>, Merkle<Media>)>, // todo: use hashcons crate for this
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -113,7 +112,7 @@ pub enum Dir2D {
     Up,
     Down,
     Left,
-    Right
+    Right,
 }
 
 #[derive(Debug, Serialize, Deserialize, Hash)]
@@ -124,7 +123,7 @@ pub struct State {
 pub type Hash = u64;
 pub type Nat = usize;
 
-pub type Map<X,Y> = std::collections::HashMap<X,Y>;
+pub type Map<X, Y> = std::collections::HashMap<X, Y>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum Name {
@@ -144,23 +143,21 @@ pub enum Atom {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Location {
-    pub time:  Name,
+    pub time: Name,
     pub place: Name,
 }
-
-
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // See design/AdaptonDesign.md for details.
 
 pub mod adapton {
+    use super::{Command, Exp, Media, Name};
     use serde::{Deserialize, Serialize};
-    use super::{Name, Media, Command, Exp};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     /// media-naming environments
     pub struct Env {
-        pub bindings:Vec<(Name, Media)>
+        pub bindings: Vec<(Name, Media)>,
     }
     /// media-producing closures
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
@@ -177,7 +174,7 @@ pub mod adapton {
         pub incoming: Vec<Edge>,
     }
     /// a Thunk node defines a "locus of changing demand & control" within the DCG;
-    /// when observed, it performs actions on other nodes, 
+    /// when observed, it performs actions on other nodes,
     /// each recorded as an `outgoing` edge on its dependency, another node.
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Thunk {
@@ -218,7 +215,7 @@ pub mod adapton {
     /// The public type exposed by ref and thunk allocation
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct NodeId {
-        pub name: Name
+        pub name: Name,
     }
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub enum Node {
@@ -226,23 +223,21 @@ pub mod adapton {
         Thunk(Thunk),
     }
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-    pub struct Context {
-
-    }
+    pub struct Context {}
     impl Context {
-        fn enter_scope(name:Name) {
+        fn enter_scope(name: Name) {
             unimplemented!()
         }
         fn leave_scope() {
             unimplemented!()
         }
-        fn thunk(name:Option<Name>, closure:Closure) -> NodeId {
+        fn thunk(name: Option<Name>, closure: Closure) -> NodeId {
             unimplemented!()
         }
-        fn set(name:Option<Name>, media:Media) -> NodeId {
+        fn set(name: Option<Name>, media: Media) -> NodeId {
             unimplemented!()
         }
-        fn get(name:Name, node:NodeId) {
+        fn get(name: Name, node: NodeId) {
             unimplemented!()
         }
     }
@@ -277,11 +272,10 @@ pub mod render {
     }
     pub enum Elm {
         Rect(Rect, Fill),
-        Node(Box<Node>)
+        Node(Box<Node>),
     }
     pub type Elms = Vec<Elm>;
 }
-
 
 pub mod util {
     use super::*;
@@ -292,22 +286,21 @@ pub mod util {
     }
      */
 
-    pub fn name_of_str(s:&str) -> Name {
+    pub fn name_of_str(s: &str) -> Name {
         let atom = Atom::String(s.to_string());
         Name::Atom(atom)
     }
 
-    pub fn name_of_usize(u:usize) -> Name {
+    pub fn name_of_usize(u: usize) -> Name {
         let atom = Atom::Usize(u);
         Name::Atom(atom)
     }
 
-    pub fn name_of_string(s:String) -> Name {
+    pub fn name_of_string(s: String) -> Name {
         let atom = Atom::String(s);
         Name::Atom(atom)
     }
 }
-
 
 /*
 

@@ -1,6 +1,6 @@
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
-use types::{Media, Name, Dir1D};
+use types::{Dir1D, Media, Name};
 
 /// a chain is an affine linked-list of nodes, each with optionally-named media.
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -29,19 +29,41 @@ pub type Res<R> = Result<R, AutoError>;
 pub type Unit = Res<()>;
 
 impl Chain {
-    pub fn insert_start(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
-    pub fn insert_end(&mut self, name:Name, media:Media) -> Unit { unimplemented!() }
-    pub fn insert_after(&mut self, name:Name, name_new:Name, media:Media) -> Unit { unimplemented!() }
-    pub fn insert_before(&mut self, name:Name, name_new:Name, media:Media) -> Unit { unimplemented!() }
+    pub fn insert_start(&mut self, name: Name, media: Media) -> Unit {
+        unimplemented!()
+    }
+    pub fn insert_end(&mut self, name: Name, media: Media) -> Unit {
+        unimplemented!()
+    }
+    pub fn insert_after(&mut self, name: Name, name_new: Name, media: Media) -> Unit {
+        unimplemented!()
+    }
+    pub fn insert_before(&mut self, name: Name, name_new: Name, media: Media) -> Unit {
+        unimplemented!()
+    }
 
-    pub fn delete_start(&mut self) -> Res<Media> { unimplemented!() }
-    pub fn delete_end(&mut self) -> Res<Media> { unimplemented!() }
-    pub fn delete_after(&mut self, name:Name) -> Res<Media> { unimplemented!() }
-    pub fn delete_before(&mut self, name:Name) -> Res<Media> { unimplemented!() }
+    pub fn delete_start(&mut self) -> Res<Media> {
+        unimplemented!()
+    }
+    pub fn delete_end(&mut self) -> Res<Media> {
+        unimplemented!()
+    }
+    pub fn delete_after(&mut self, name: Name) -> Res<Media> {
+        unimplemented!()
+    }
+    pub fn delete_before(&mut self, name: Name) -> Res<Media> {
+        unimplemented!()
+    }
 
-    pub fn replace_start(&mut self, media:Media) -> Res<Media> { unimplemented!() }
-    pub fn replace_end(&mut self, media:Media) -> Res<Media> { unimplemented!() }    
-    pub fn replace(&mut self, name:Name, media:Media) -> Res<Media> { unimplemented!() }
+    pub fn replace_start(&mut self, media: Media) -> Res<Media> {
+        unimplemented!()
+    }
+    pub fn replace_end(&mut self, media: Media) -> Res<Media> {
+        unimplemented!()
+    }
+    pub fn replace(&mut self, name: Name, media: Media) -> Res<Media> {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -50,7 +72,7 @@ pub enum AutoCommand {
     InsertEnd(Name, Media),
     InsertBefore(Name, Name, Media),
     InsertAfter(Name, Name, Media),
-    
+
     DeleteStart,
     DeleteEnd,
     DeleteAfter(Name),
@@ -66,28 +88,28 @@ use self::AutoCommand::*;
 impl AutoCommand {
     fn is_insert(&self) -> bool {
         match &self {
-            &InsertStart(_,_)  => true,
-            &InsertEnd(_,_)   => true,
-            &InsertAfter(_,_,_)  => true,
-            &InsertBefore(_,_,_)  => true,
-            _                 => false,
+            &InsertStart(_, _) => true,
+            &InsertEnd(_, _) => true,
+            &InsertAfter(_, _, _) => true,
+            &InsertBefore(_, _, _) => true,
+            _ => false,
         }
     }
     fn is_delete(&self) -> bool {
         match &self {
-            &DeleteStart  => true,
-            &DeleteEnd   => true,
-            &DeleteAfter(_)  => true,
+            &DeleteStart => true,
+            &DeleteEnd => true,
+            &DeleteAfter(_) => true,
             &DeleteBefore(_) => true,
-            _                  => false,
+            _ => false,
         }
     }
     fn is_replace(&self) -> bool {
         match &self {
-            &Replace(_,_) => true,
+            &Replace(_, _) => true,
             &ReplaceStart(_) => true,
-            &ReplaceEnd(_)  => true,
-            _                => false,
+            &ReplaceEnd(_) => true,
+            _ => false,
         }
     }
 }
@@ -139,79 +161,83 @@ pub enum Command {
 
 mod semantics {
     //use super::{Chain, Command, AutoCommand, EditCommand, InitCommand, Editor, EditorState};
-    use super::{Chain, Command, AutoCommand, EditCommand, EditorState, Res, Media};
+    use super::{AutoCommand, Chain, Command, EditCommand, EditorState, Media, Res};
 
     // todo -- if we instead assume a moved Command rather than a borrowed one, we avoid clone()s here?
     //         OTOH, if we use a borrow, the Command constructors are affine too, which can be annoying, esp for logging.
 
-    pub fn chain_eval(chain:&mut Chain, command: &AutoCommand) -> Res<Option<Media>> {
+    pub fn chain_eval(chain: &mut Chain, command: &AutoCommand) -> Res<Option<Media>> {
         trace!("chain_eval {:?} ...", command);
         use self::AutoCommand::*;
-        pub fn some(r:Res<Media>) -> Res<Option<Media>> { r.map(|m| Some(m)) };
-        pub fn none(r:Res<()>) -> Res<Option<Media>> { r.map(|_| None) };
+        pub fn some(r: Res<Media>) -> Res<Option<Media>> {
+            r.map(|m| Some(m))
+        };
+        pub fn none(r: Res<()>) -> Res<Option<Media>> {
+            r.map(|_| None)
+        };
         let res = match &command {
             InsertStart(ref n, ref m) => none(chain.insert_start(n.clone(), m.clone())),
-            DeleteStart        => some(chain.delete_start()),
-            InsertEnd(ref n, ref m)   => none(chain.insert_end(n.clone(), m.clone())),
-            DeleteEnd          => some(chain.delete_end()),
-            Replace(ref n, ref m)      => some(chain.replace(n.clone(), m.clone())),
-            ReplaceStart(ref m)      => some(chain.replace_start(m.clone())),
-            ReplaceEnd(ref m)      => some(chain.replace_end(m.clone())),
-            InsertAfter(ref n, ref nn, ref m)  => none(chain.insert_after(n.clone(), nn.clone(), m.clone())),
-            DeleteAfter(ref n)         => some(chain.delete_after(n.clone())),
-            InsertBefore(ref n, ref nn, ref m) => none(chain.insert_before(n.clone(), nn.clone(), m.clone())),
-            DeleteBefore(ref n)        => some(chain.delete_before(n.clone())),
+            DeleteStart => some(chain.delete_start()),
+            InsertEnd(ref n, ref m) => none(chain.insert_end(n.clone(), m.clone())),
+            DeleteEnd => some(chain.delete_end()),
+            Replace(ref n, ref m) => some(chain.replace(n.clone(), m.clone())),
+            ReplaceStart(ref m) => some(chain.replace_start(m.clone())),
+            ReplaceEnd(ref m) => some(chain.replace_end(m.clone())),
+            InsertAfter(ref n, ref nn, ref m) => {
+                none(chain.insert_after(n.clone(), nn.clone(), m.clone()))
+            }
+            DeleteAfter(ref n) => some(chain.delete_after(n.clone())),
+            InsertBefore(ref n, ref nn, ref m) => {
+                none(chain.insert_before(n.clone(), nn.clone(), m.clone()))
+            }
+            DeleteBefore(ref n) => some(chain.delete_before(n.clone())),
         };
         trace!("chain_eval {:?} ==> {:?}", command, res);
         res
     }
 
-    pub fn editor_state_eval(editor:&mut EditorState,
-                             command:&EditCommand) -> Result<(), String>
-    {
+    pub fn editor_state_eval(
+        editor: &mut EditorState,
+        command: &EditCommand,
+    ) -> Result<(), String> {
         trace!("editor_state_eval: {:?}", command);
         unimplemented!()
     }
 
-    pub fn editor_eval(editor:&mut EditorState,
-                       command:&Command) -> Result<(), String>
-    {
+    pub fn editor_eval(editor: &mut EditorState, command: &Command) -> Result<(), String> {
         trace!("editor_eval: {:?}", command);
         unimplemented!()
     }
-
-
 }
 
 pub mod io {
     //use super::{EditorState, EditCommand, Dir1D};
-    use super::{EditorState, EditCommand};
+    use super::{EditCommand, EditorState};
     use sdl2::event::Event;
     use types::render;
 
-    pub fn consume_input(event:Event) -> Result<Vec<EditCommand>, ()> {
+    pub fn consume_input(event: Event) -> Result<Vec<EditCommand>, ()> {
         use sdl2::keyboard::Keycode;
         match event {
-            Event::Quit {..}
+            Event::Quit { .. }
             | Event::KeyDown {
-                keycode: Some(Keycode::Escape), ..
+                keycode: Some(Keycode::Escape),
+                ..
+            } => Err(()),
+            Event::KeyDown {
+                keycode: Some(kc), ..
             } => {
-                Err(())
-            },
-            Event::KeyDown{keycode:Some(kc), ..} => {
                 // todo
                 match kc {
                     Keycode::Space => Ok(vec![]),
-                    Keycode::Left  => Ok(vec![]),
+                    Keycode::Left => Ok(vec![]),
                     Keycode::Right => Ok(vec![]),
-                    Keycode::Up    => Ok(vec![]),
-                    Keycode::Down  => Ok(vec![]),
-                    _              => Ok(vec![]),
+                    Keycode::Up => Ok(vec![]),
+                    Keycode::Down => Ok(vec![]),
+                    _ => Ok(vec![]),
                 }
-            },
-            _ => {
-                Ok(vec![])
             }
+            _ => Ok(vec![]),
         }
     }
 
@@ -219,14 +245,12 @@ pub mod io {
     pub fn render_elms<T: RenderTarget>(
         canvas: &mut Canvas<T>,
         edit_state: &EditorState,
-    ) -> Result<render::Elms, String>
-    {
-        let mut out : render::Elms = vec![];
+    ) -> Result<render::Elms, String> {
+        let mut out: render::Elms = vec![];
         //use sdl2::rect::{Rect};
         //use sdl2::pixels::Color;
 
         // todo
         Ok(vec![])
     }
-
 }

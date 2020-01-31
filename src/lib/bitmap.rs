@@ -1,7 +1,7 @@
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
 
-use types::{Nat, Dir2D};
+use types::{Dir2D, Nat};
 
 // Step 1:
 // -------
@@ -24,7 +24,7 @@ pub enum Major {
     Row,
 
     /// column major ordering (columns indexed first, then rows)
-    Col
+    Col,
 }
 
 // Step 2:
@@ -54,7 +54,7 @@ pub struct EditorState {
     pub bitmap: Bitmap,
 
     /// initialized by an Init command; affected by Edit commands (but not Auto commands)
-    pub cursor: (Nat, Nat)
+    pub cursor: (Nat, Nat),
 }
 
 // Step (3b) --
@@ -140,12 +140,12 @@ pub enum Command {
 /// and the abstract syntax of its associated commands
 /// (independent from any IO library implementation details).
 pub mod semantics {
-    use super::{Bitmap, Major, AutoCommand};
-    use super::{Editor, EditorState, Command, InitCommand, EditCommand, Dir2D};
+    use super::{AutoCommand, Bitmap, Major};
+    use super::{Command, Dir2D, EditCommand, Editor, EditorState, InitCommand};
 
-    fn bitmap_init(w:usize, h:usize) -> Bitmap {
-        let row = vec![ false ; w ];
-        let bits = vec![ row.clone() ; h ];
+    fn bitmap_init(w: usize, h: usize) -> Bitmap {
+        let row = vec![false; w];
+        let bits = vec![row.clone(); h];
         Bitmap {
             width: row.len(),
             height: bits.len(),
@@ -154,7 +154,7 @@ pub mod semantics {
         }
     }
 
-    pub fn bitmap_set_bit(bitmap:&mut Bitmap, x:usize, y:usize, b:bool) {
+    pub fn bitmap_set_bit(bitmap: &mut Bitmap, x: usize, y: usize, b: bool) {
         match bitmap.major {
             Major::Row => bitmap.bits[x][y] = b,
             Major::Col => bitmap.bits[y][x] = b,
@@ -162,7 +162,7 @@ pub mod semantics {
         debug!("bitmap_set_bit({}, {}, {})", x, y, b);
     }
 
-    pub fn bitmap_get_bit(bitmap:&Bitmap, x:usize, y:usize) -> bool {
+    pub fn bitmap_get_bit(bitmap: &Bitmap, x: usize, y: usize) -> bool {
         let b = match bitmap.major {
             Major::Row => bitmap.bits[x][y],
             Major::Col => bitmap.bits[y][x],
@@ -171,11 +171,11 @@ pub mod semantics {
         b
     }
 
-    pub fn bitmap_get_size(bitmap:&Bitmap) -> (usize, usize) {
+    pub fn bitmap_get_size(bitmap: &Bitmap) -> (usize, usize) {
         (bitmap.width, bitmap.height)
     }
 
-    pub fn bitmap_toggle_bit(bitmap:&mut Bitmap, x:usize, y:usize) -> bool {
+    pub fn bitmap_toggle_bit(bitmap: &mut Bitmap, x: usize, y: usize) -> bool {
         let b = bitmap_get_bit(bitmap, x, y);
         bitmap_set_bit(bitmap, x, y, !b);
         debug!("bitmap_toggle_bit({}, {}) = {}", x, y, !b);
@@ -189,40 +189,43 @@ pub mod semantics {
     // 4. The successful return value could be `Media` (the full adjunction), or another trait param.
     // 5. The failure error code could be a common error type (every possible error), or a trait param.
 
-    pub fn bitmap_eval(bitmap:&mut Bitmap, command:&AutoCommand) -> Result<(), String> {
+    pub fn bitmap_eval(bitmap: &mut Bitmap, command: &AutoCommand) -> Result<(), String> {
         debug!("bitmap_eval {:?}", command);
         let res = match command {
-            &AutoCommand::ToggleBit(x, y) => { bitmap_toggle_bit(bitmap, x, y); }, // to do: actually return the bit.
-            &AutoCommand::SetBit(x, y, b) => { bitmap_set_bit(bitmap, x, y, b); },
+            &AutoCommand::ToggleBit(x, y) => {
+                bitmap_toggle_bit(bitmap, x, y);
+            } // to do: actually return the bit.
+            &AutoCommand::SetBit(x, y, b) => {
+                bitmap_set_bit(bitmap, x, y, b);
+            }
         };
         let res = Ok(res);
         debug!("bitmap_eval {:?} ==> {:?}", command, res);
         res
     }
 
-    pub fn editor_state_eval(editor:&mut EditorState,
-                             command:&EditCommand) -> Result<(), String>
-    {
+    pub fn editor_state_eval(
+        editor: &mut EditorState,
+        command: &EditCommand,
+    ) -> Result<(), String> {
         debug!("editor_state_eval {:?}", command);
         let res = match command {
             &EditCommand::MoveRel(ref dir) => {
                 let (w, h) = (editor.bitmap.width, editor.bitmap.height);
                 let (x, y) = editor.cursor;
                 editor.cursor = match *dir {
-                    Dir2D::Left  => (if x == 0 { 0 } else { x - 1 }, y),
+                    Dir2D::Left => (if x == 0 { 0 } else { x - 1 }, y),
                     Dir2D::Right => (if x + 1 >= w { w - 1 } else { x + 1 }, y),
-                    Dir2D::Up    => (x, if y == 0 { 0 } else { y - 1 }),
-                    Dir2D::Down  => (x, if y + 1 >= h { h - 1 } else { y + 1 }),
+                    Dir2D::Up => (x, if y == 0 { 0 } else { y - 1 }),
+                    Dir2D::Down => (x, if y + 1 >= h { h - 1 } else { y + 1 }),
                 };
                 Ok(())
             }
             &EditCommand::MoveAbs(x, y) => {
-                if x < editor.bitmap.width &&
-                    y < editor.bitmap.height {
-                        editor.cursor = (x, y);
-                        Ok(())
-                    }
-                else {
+                if x < editor.bitmap.width && y < editor.bitmap.height {
+                    editor.cursor = (x, y);
+                    Ok(())
+                } else {
                     Err("MoveAbs: invalid coordinate".to_string())
                 }
             }
@@ -236,17 +239,17 @@ pub mod semantics {
         res
     }
 
-    pub fn editor_eval(editor:&mut Editor, command:&Command) -> Result<(), String> {
+    pub fn editor_eval(editor: &mut Editor, command: &Command) -> Result<(), String> {
         let num = editor.history.len();
         debug!("#{}: editor_eval {:?}", num, command);
         // save the command in the history
-        editor.history.push( command.clone() );
+        editor.history.push(command.clone());
         // evaluate the command in the appropriate evaluation context:
         let res = match command {
             &Command::Init(ref command) => {
-                editor.state = Some(EditorState{
+                editor.state = Some(EditorState {
                     bitmap: match command {
-                        &InitCommand::Make8x8   => bitmap_init(8,  8),
+                        &InitCommand::Make8x8 => bitmap_init(8, 8),
                         &InitCommand::Make16x16 => bitmap_init(16, 16),
                         &InitCommand::Make32x32 => bitmap_init(32, 32),
                     },
@@ -254,18 +257,14 @@ pub mod semantics {
                 });
                 Ok(())
             }
-            &Command::Auto(ref command) => {
-                match editor.state {
-                    None => Err("Invalid editor state".to_string()),
-                    Some(ref mut st) => bitmap_eval(&mut st.bitmap, &command),
-                }
-            }
-            &Command::Edit(ref command) => {
-                match editor.state {
-                    None => Err("Invalid editor state".to_string()),
-                    Some(ref mut st) => editor_state_eval(st, &command),
-                }
-            }
+            &Command::Auto(ref command) => match editor.state {
+                None => Err("Invalid editor state".to_string()),
+                Some(ref mut st) => bitmap_eval(&mut st.bitmap, &command),
+            },
+            &Command::Edit(ref command) => match editor.state {
+                None => Err("Invalid editor state".to_string()),
+                Some(ref mut st) => editor_state_eval(st, &command),
+            },
         };
         info!("#{}: editor_eval {:?} ==> {:?}", num, command, res);
         res
@@ -280,32 +279,30 @@ pub mod semantics {
 // To do: We are going to use our own `render` elements (types::render::Elms) soon.
 
 pub mod io {
-    use super::{EditorState, EditCommand, Dir2D};
+    use super::{Dir2D, EditCommand, EditorState};
     use sdl2::event::Event;
     use types::render;
 
-    pub fn consume_input(event:&Event) -> Result<Vec<EditCommand>, ()> {
+    pub fn consume_input(event: &Event) -> Result<Vec<EditCommand>, ()> {
         use sdl2::keyboard::Keycode;
         match &event {
-            Event::Quit {..}
+            Event::Quit { .. }
             | Event::KeyDown {
-                keycode: Some(Keycode::Escape), ..
-            } => {
-                Err(())
+                keycode: Some(Keycode::Escape),
+                ..
+            } => Err(()),
+            Event::KeyDown {
+                keycode: Some(ref kc),
+                ..
+            } => match &kc {
+                Keycode::Space => Ok(vec![EditCommand::Toggle]),
+                Keycode::Left => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
+                Keycode::Right => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
+                Keycode::Up => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
+                Keycode::Down => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
+                _ => Ok(vec![]),
             },
-            Event::KeyDown{keycode:Some(ref kc), ..} => {
-                match &kc {
-                    Keycode::Space => Ok(vec![EditCommand::Toggle]),
-                    Keycode::Left  => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
-                    Keycode::Right => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
-                    Keycode::Up    => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
-                    Keycode::Down  => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
-                    _              => Ok(vec![]),
-                }
-            },
-            _ => {
-                Ok(vec![])
-            }
+            _ => Ok(vec![]),
         }
     }
 
@@ -313,32 +310,29 @@ pub mod io {
     pub fn render_elms<T: RenderTarget>(
         canvas: &mut Canvas<T>,
         edit_state: &EditorState,
-    ) -> Result<render::Elms, String>
-    {
-        let mut out : render::Elms = vec![];
-        use sdl2::rect::{Rect};
+    ) -> Result<render::Elms, String> {
+        let mut out: render::Elms = vec![];
         use sdl2::pixels::Color;
+        use sdl2::rect::Rect;
 
         let zoom = 32 as usize;
-        let (width, height) = super::semantics::bitmap_get_size(
-            &edit_state.bitmap
-        );
+        let (width, height) = super::semantics::bitmap_get_size(&edit_state.bitmap);
         let border_width = 2 as usize;
 
         let grid_border_color = Color::RGB(100, 80, 100);
         let cursor_border_color = Color::RGB(150, 255, 150);
 
-        fn get_cell_color (is_set:bool, is_focus:bool) -> Color {
+        fn get_cell_color(is_set: bool, is_focus: bool) -> Color {
             // cell colors, based on two bits:
             let color_notset_notfocus = Color::RGB(0, 0, 0);
             let color_notset_isfocus = Color::RGB(0, 100, 0);
             let color_isset_notfocus = Color::RGB(255, 225, 255);
             let color_isset_isfocus = Color::RGB(240, 250, 240);
             match (is_set, is_focus) {
-            | (false, false) => color_notset_notfocus,
-            | (false, true)  => color_notset_isfocus,
-            | (true,  false) => color_isset_notfocus,
-            | (true,  true)  => color_isset_isfocus,
+                (false, false) => color_notset_notfocus,
+                (false, true) => color_notset_isfocus,
+                (true, false) => color_isset_notfocus,
+                (true, true) => color_isset_isfocus,
             }
         };
 
@@ -351,29 +345,25 @@ pub mod io {
 
         // grid border is a single background rect:
         canvas.set_draw_color(grid_border_color);
-        canvas.fill_rect(
-            Rect::new(
-                0,
-                0,
-                (width * zoom + border_width) as u32,
-                (height * zoom + border_width) as u32,
-            )
-        )?;
+        canvas.fill_rect(Rect::new(
+            0,
+            0,
+            (width * zoom + border_width) as u32,
+            (height * zoom + border_width) as u32,
+        ))?;
         canvas.set_draw_color(cursor_border_color);
         canvas.fill_rect(cursor_rect)?;
         // grid cells are rects:
         for x in 0..width {
             for y in 0..height {
-                let cell_rect =
-                    Rect::new(
-                        (x * zoom + border_width) as i32,
-                        (y * zoom + border_width) as i32,
-                        (zoom as i32 - (border_width * 2) as i32) as u32,
-                        (zoom as i32 - (border_width * 2) as i32) as u32,
-                    );
-                let bit = super::semantics::bitmap_get_bit(
-                    &edit_state.bitmap, x as usize, y as usize
+                let cell_rect = Rect::new(
+                    (x * zoom + border_width) as i32,
+                    (y * zoom + border_width) as i32,
+                    (zoom as i32 - (border_width * 2) as i32) as u32,
+                    (zoom as i32 - (border_width * 2) as i32) as u32,
                 );
+                let bit =
+                    super::semantics::bitmap_get_bit(&edit_state.bitmap, x as usize, y as usize);
                 let cell_color = get_cell_color(bit, (x as usize, y as usize) == edit_state.cursor);
                 canvas.set_draw_color(cell_color);
                 canvas.fill_rect(cell_rect)?;
@@ -385,5 +375,4 @@ pub mod io {
         // todo
         Ok(vec![])
     }
-
 }

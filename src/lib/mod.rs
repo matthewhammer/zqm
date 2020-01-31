@@ -1,4 +1,5 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
 extern crate serde;
 extern crate serde_bytes;
@@ -17,7 +18,7 @@ pub type GlyphMap = std::collections::HashMap<types::Name, Glyph>;
 pub mod chain;
 pub mod grid;
 
-pub mod types;
-pub mod eval;
 pub mod bitmap;
+pub mod eval;
 pub mod glyph;
+pub mod types;

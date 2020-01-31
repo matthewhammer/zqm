@@ -1,9 +1,10 @@
 // SDL: Keyboard/mouse input events, multi-media output abstractions:
-extern crate sdl2;
 extern crate hashcons;
+extern crate sdl2;
 
 // Logging:
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 
 extern crate serde;
@@ -26,7 +27,7 @@ use zoom_quilt_maker::{eval, types};
 
 /// zoom-quilt-maker
 #[derive(StructOpt, Debug)]
-#[structopt(name="zqm",raw(setting="clap::AppSettings::DeriveDisplayOrder"))]
+#[structopt(name = "zqm", raw(setting = "clap::AppSettings::DeriveDisplayOrder"))]
 struct CliOpt {
     /// Enable tracing -- the most verbose log.
     #[structopt(short = "t", long = "trace-log")]
@@ -43,37 +44,36 @@ struct CliOpt {
 
 #[derive(StructOpt, Debug)]
 enum CliCommand {
-    #[structopt(name  = "start",
-                about = "Start interactively.")]
+    #[structopt(name = "start", about = "Start interactively.")]
     Start,
 
-    #[structopt(name  = "resume",
-                about = "Resume last interaction.")]
+    #[structopt(name = "resume", about = "Resume last interaction.")]
     Resume,
 
-    #[structopt(name  = "replay",
-                about = "Replay last interaction.")]
+    #[structopt(name = "replay", about = "Replay last interaction.")]
     Replay,
 
-    #[structopt(name  = "history",
-                about = "Interact with history, the list of all prior interactions.")]
+    #[structopt(
+        name = "history",
+        about = "Interact with history, the list of all prior interactions."
+    )]
     History,
 
-    #[structopt(name  = "version",
-                about = "Display version.")]
+    #[structopt(name = "version", about = "Display version.")]
     Version,
 
-    #[structopt(name  = "completions",
-                about = "Generate shell scripts for zqm subcommand auto-completions.")]
-    Completions{
-        shell: Shell,
-    },
+    #[structopt(
+        name = "completions",
+        about = "Generate shell scripts for zqm subcommand auto-completions."
+    )]
+    Completions { shell: Shell },
 }
 
-fn init_log(level_filter:log::LevelFilter) {
+fn init_log(level_filter: log::LevelFilter) {
     use env_logger::{Builder, WriteStyle};
     let mut builder = Builder::new();
-    builder.filter(None, level_filter)
+    builder
+        .filter(None, level_filter)
         .write_style(WriteStyle::Always)
         .init();
 }
@@ -88,9 +88,11 @@ pub fn do_event_loop(state: &mut types::State) -> Result<(), String> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let window = video_subsystem
-        .window("zoom-quilt-maker",
-                grid_size.0 * zoom + 1,
-                grid_size.1 * zoom + 1)
+        .window(
+            "zoom-quilt-maker",
+            grid_size.0 * zoom + 1,
+            grid_size.1 * zoom + 1,
+        )
         .position_centered()
         .resizable()
         //.input_grabbed()
@@ -99,7 +101,8 @@ pub fn do_event_loop(state: &mut types::State) -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    let mut canvas = window.into_canvas()
+    let mut canvas = window
+        .into_canvas()
         .target_texture()
         .present_vsync()
         .build()
@@ -126,23 +129,21 @@ pub fn do_event_loop(state: &mut types::State) -> Result<(), String> {
                 // todo actually render them
                 drop(elms);
             }
-            Err(()) => {
-                break 'running
-            }
+            Err(()) => break 'running,
         }
-    };
+    }
     Ok(())
 }
 
 fn main() {
-    let cliopt  = CliOpt::from_args();
+    let cliopt = CliOpt::from_args();
     init_log(
         match (cliopt.log_trace, cliopt.log_debug, cliopt.log_quiet) {
             (true, _, _) => log::LevelFilter::Trace,
             (_, true, _) => log::LevelFilter::Debug,
             (_, _, true) => log::LevelFilter::Error,
-            (_, _,    _) => log::LevelFilter::Info,
-        }
+            (_, _, _) => log::LevelFilter::Info,
+        },
     );
 
     let mut state = eval::load_state();
@@ -154,7 +155,7 @@ fn main() {
             const VERSION: &'static str = env!("CARGO_PKG_VERSION");
             println!("{}", VERSION);
         }
-        CliCommand::Completions{shell:s} => {
+        CliCommand::Completions { shell: s } => {
             // see also: https://clap.rs/effortless-auto-completion/
             //
             CliOpt::clap().gen_completions_to("zqm", s, &mut io::stdout());
@@ -168,11 +169,7 @@ fn main() {
             do_event_loop(&mut state).unwrap();
             eval::save_state(&state);
         }
-        CliCommand::Replay => {
-            unimplemented!()
-        }
-        CliCommand::History => {
-            unimplemented!()
-        }
+        CliCommand::Replay => unimplemented!(),
+        CliCommand::History => unimplemented!(),
     }
 }
