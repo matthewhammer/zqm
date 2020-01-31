@@ -4,11 +4,14 @@
 
 // Serde: Persistent state between invocations of ZQM
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
+use hashcons::merkle::Merkle;
+use std::collections::HashMap;
+
+pub type Shared<X> = Merkle<X>;
 
 /// Media combines words and images
 /// (eventually, we add sound and moving images)
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Media {
     Void,
     Atom(Atom),
@@ -21,11 +24,15 @@ pub enum Media {
     StoreProj(Store, Name),
     Named(Name, Box<Media>),
     Located(Location, Box<Media>),
+    Merkle(Merkle<Media>),
 }
 
 /// We lift Media to an expression language, with media operations, and adapton operations
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Exp {
+    //----------------------------------------------------------------
+    // Media forms (think "data values" in the PL sense):
+    //----------------------------------------------------------------
     Void,
     Atom(Atom),
     Name(Name),
@@ -37,9 +44,11 @@ pub enum Exp {
     StoreProj(Box<Exp>, Name),
     Named(Name, Box<Exp>),
     Located(Location, Box<Exp>),
+    Merkle(Merkle<Exp>),
     //----------------------------------------------------------------
-    // Media forms above; More expression forms below:
+    // Expression forms (whose evaluation produces Media):
     //----------------------------------------------------------------
+    MerkleFrom(Box<Exp>),
     StoreFrom(Name, Box<Exp>),
     Command(Command),
     Block(Block),
@@ -53,23 +62,23 @@ pub enum Exp {
 }
 
 /// an expression block consists of a sequence of bindings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Block {
     pub bindings: Vec<(Name, Exp)>
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Store {
     //pub name: Rc<Name>,
-    pub name: Name,
+    pub name: Merkle<Name>,
     // finite map from names to StoreRecords
     // will be shared, non-linearly, by each associated StoreProj
     // representation to use hash-consing for O(1) clones and O(1) serialize
-
+    pub table: Vec<(Merkle<Name>, Merkle<Media>)>
     // todo: use hashcons crate for this
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct StoreRecord {
     //pub name: Rc<Name>,
     //pub content: Rc<Media>,
@@ -77,7 +86,7 @@ pub struct StoreRecord {
     pub content: Media,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Hash)]
 pub enum Editor {
     Bitmap(Box<super::bitmap::Editor>),
     Chain(Box<super::chain::Editor>),
@@ -86,20 +95,20 @@ pub enum Editor {
 
 // to do -- eventually, we may want these to be "open" wrt the exp environment;
 // for expressing scripts, etc; then we'd need to do substitution, or more env-passing, or both.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum Command {
     Bitmap(super::bitmap::Command),
     Chain(super::chain::Command),
     Grid(super::grid::Command),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum Dir1D {
     Forward,
     Backward,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum Dir2D {
     Up,
     Down,
@@ -107,7 +116,7 @@ pub enum Dir2D {
     Right
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct State {
     pub editor: Editor,
 }
@@ -118,16 +127,11 @@ pub type Nat = usize;
 pub type Map<X,Y> = std::collections::HashMap<X,Y>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct Name {
-    pub tree: Box<NameTree>,
-    // Eventually(as of 2020-01-04): pub hash: Hash,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum NameTree {
+pub enum Name {
     Atom(Atom),
-    Option(Option<Name>),
-    TaggedTuple(Name, Vec<Name>)
+    Option(Option<Box<Name>>),
+    TaggedTuple(Box<Name>, Vec<Name>),
+    Merkle(Merkle<Name>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -138,7 +142,7 @@ pub enum Atom {
     // Eventually(as of 2020-01-04): Permit Media to name Media.
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Location {
     pub time:  Name,
     pub place: Name,
@@ -153,20 +157,20 @@ pub mod adapton {
     use serde::{Deserialize, Serialize};
     use super::{Name, Media, Command, Exp};
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     /// media-naming environments
     pub struct Env {
         pub bindings:Vec<(Name, Media)>
     }
     /// media-producing closures
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Closure {
         pub env: Env,
         pub exp: Exp,
     }
     /// a Ref node names a "locus of changing data" within the DCG;
     /// when observed by a thunk node, it records this dependent as a new `incoming` edge.
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Ref {
         pub content: Media,
         // aka, dependents that depend on this node
@@ -175,7 +179,7 @@ pub mod adapton {
     /// a Thunk node defines a "locus of changing demand & control" within the DCG;
     /// when observed, it performs actions on other nodes, 
     /// each recorded as an `outgoing` edge on its dependency, another node.
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Thunk {
         pub closure: Closure,
         pub result: Option<Media>,
@@ -190,7 +194,7 @@ pub mod adapton {
     /// future actions to the source of the edge, or its transitive dependencies.
     /// Dirty edges cannot be reused via memoization.
     /// Invariant: not(dirty_flag) implies checkpoint is consistent, transitively.
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Edge {
         /// edge source; subject of the action along edge
         pub dependent: NodeId,
@@ -202,7 +206,7 @@ pub mod adapton {
         pub dirty_flag: bool,
     }
     /// The data associated with an action as required by an edge's checkpoint of that action
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub enum Action {
         /// allocate/overwrite a ref node with given media
         Put(Media),
@@ -212,17 +216,17 @@ pub mod adapton {
         Get(Media),
     }
     /// The public type exposed by ref and thunk allocation
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct NodeId {
         pub name: Name
     }
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub enum Node {
         Ref(Ref),
         Thunk(Thunk),
     }
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct Context {
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+    pub struct Context {
 
     }
     impl Context {
@@ -290,17 +294,17 @@ pub mod util {
 
     pub fn name_of_str(s:&str) -> Name {
         let atom = Atom::String(s.to_string());
-        Name{tree:Box::new(NameTree::Atom(atom))}
+        Name::Atom(atom)
     }
 
     pub fn name_of_usize(u:usize) -> Name {
         let atom = Atom::Usize(u);
-        Name{tree:Box::new(NameTree::Atom(atom))}
+        Name::Atom(atom)
     }
 
     pub fn name_of_string(s:String) -> Name {
         let atom = Atom::String(s);
-        Name{tree:Box::new(NameTree::Atom(atom))}
+        Name::Atom(atom)
     }
 }
 

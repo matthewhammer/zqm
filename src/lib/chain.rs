@@ -3,21 +3,21 @@ use serde::{Deserialize, Serialize};
 use types::{Media, Name, Dir1D};
 
 /// a chain is an affine linked-list of nodes, each with optionally-named media.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Chain {
     Empty,
     Node(Node, Box<Chain>),
 }
 
 /// a node contains media, with an optional name.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Node {
     pub name: Name,
     pub media: Box<Media>,
 }
 
 /// errors that may arise from chain methods, and `AutoCommand` evaluation.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum AutoError {
     /// error for insert/delete/replace when name is absent
     AbsentName(Name, Option<Media>),
@@ -44,7 +44,7 @@ impl Chain {
     pub fn replace(&mut self, name:Name, media:Media) -> Res<Media> { unimplemented!() }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum AutoCommand {
     InsertStart(Name, Media),
     InsertEnd(Name, Media),
@@ -92,26 +92,26 @@ impl AutoCommand {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct EditorState {
     pub head: Chain,
     pub cursor: Option<Node>,
     pub tail: Chain,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct Editor {
     pub history: Vec<Command>,
     pub state: Option<EditorState>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum InitCommand {
     Empty,
     String(String),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum EditCommand {
     MoveRel(Dir1D),
     MoveAbs(usize),
@@ -123,7 +123,7 @@ pub enum EditCommand {
 }
 
 /// commands that advance the evolution of a bitmap
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum Command {
     /// commands that create new bitmaps
     Init(InitCommand),

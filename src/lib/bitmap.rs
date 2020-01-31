@@ -9,7 +9,7 @@ use types::{Nat, Dir2D};
 // (no references or lifetimes; everything is affine, so no Rc<_>s either.)
 
 /// a grid of bits, represented as a 2D array
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Bitmap {
     pub width: Nat,
     pub height: Nat,
@@ -18,7 +18,7 @@ pub struct Bitmap {
 }
 
 /// row-versus-column major order for grid representation
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Major {
     /// row major ordering (rows indexed first, then columns)
     Row,
@@ -33,7 +33,7 @@ pub enum Major {
 
 /// commands that advance the state of the bitmap,
 /// whose execution is independent of editor state
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum AutoCommand {
     /// toggle the bit at the given coordinate
     ToggleBit(Nat, Nat),
@@ -48,7 +48,7 @@ pub enum AutoCommand {
 // Define a canonical editor for the structure in question.  Again, use simplified, affine Rust.
 
 /// the history-_independent_ state of the editor
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct EditorState {
     /// created by an Init command; affected by Auto and Edit commands
     pub bitmap: Bitmap,
@@ -62,7 +62,7 @@ pub struct EditorState {
 //   includes the command history, and any "pre-states" before initialization completes.
 
 /// the history-_dependent_ state of the editoro
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct Editor {
     /// full linear history of this bitmap's evolution, as a sequence of commands
     pub history: Vec<Command>,
@@ -76,7 +76,7 @@ pub struct Editor {
 // Define commands that initialize the editor state.
 
 /// commands that create new bitmaps
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum InitCommand {
     /// make a new 8x8 grid of bits
     Make8x8,
@@ -95,7 +95,7 @@ pub enum InitCommand {
 
 /// commands that advance the editor state,
 /// and possibly, its associated bitmap state.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum EditCommand {
     /// move the grid cursor one unit in a relative direction
     MoveRel(Dir2D),
@@ -114,7 +114,7 @@ pub enum EditCommand {
 // and Edit sublanguages.
 
 /// commands that advance the evolution of a bitmap
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum Command {
     /// commands that create new bitmaps
     Init(InitCommand),
