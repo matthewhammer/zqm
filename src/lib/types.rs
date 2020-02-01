@@ -226,7 +226,10 @@ pub mod adapton {
         Thunk(Thunk),
     }
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-    pub struct Context {}
+    pub struct Context {
+        pub log_buf: LogEvents,
+        pub log_stack: Vec<LogEvents>,
+    }
     impl Context {
         pub fn enter_scope(&mut self, name: Name) {
             adapton::enter_scope(self, name)
@@ -252,6 +255,27 @@ pub mod adapton {
             adapton::get(self, name, node)
         }
     }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+    pub enum LogEvent {
+        Put(Name, Media, LogEvents),
+        PutThunk(Name, Closure, LogEvents),
+        Get(Name, Closure, LogEvents),
+        DirtyIncomingTo(Name, LogEvents),
+        CleanEdgeTo(Name, bool, LogEvents),
+        CleanThunk(Name, bool, LogEvents),
+        EvalThunk(Name, EvalResult, LogEvents),
+    }
+    pub enum LogEventTag {
+        Put(Name, Media),
+        PutThunk(Name, Closure),
+        Get(Name, Closure),
+        DirtyIncomingTo(Name),
+        CleanEdgeTo(Name, bool),
+        CleanThunk(Name, bool),
+        EvalThunk(Name, EvalResult),
+    }
+    pub type LogEvents = Vec<LogEvent>;
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
