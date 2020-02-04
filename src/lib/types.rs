@@ -226,7 +226,20 @@ pub mod adapton {
         Thunk(Thunk),
     }
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+    pub enum Agent {
+        Archivist,
+        Editor,
+    }
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+    pub struct Store ( pub Vec<(Name, Node)> );
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+    pub struct Stack ( pub Vec<Name> );
+    #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Context {
+        pub agent: Agent,
+        pub edges: Vec<Edge>,
+        pub stack: Stack,
+        pub store: Store,
         pub log_buf: LogEvents,
         pub log_stack: Vec<LogEvents>,
     }
@@ -246,7 +259,7 @@ pub mod adapton {
         }
         pub fn put(
             &mut self,
-            name: Option<Name>,
+            name: Name,
             media: Media,
         ) -> Result<NodeId, adapton::PutError> {
             adapton::put(self, name, media)
