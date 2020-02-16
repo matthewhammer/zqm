@@ -212,6 +212,7 @@ pub mod semantics {
     }
 }
 
+/*
 pub mod io {
     //use super::{EditorState, EditCommand, Dir1D};
     use super::{EditCommand, EditorState};
@@ -256,3 +257,4 @@ pub mod io {
         Ok(out)
     }
 }
+*/

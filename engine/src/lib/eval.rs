@@ -1,21 +1,22 @@
 // rename this module to 'engine'?
 
+use bitmap;
 use super::types::{
     lang::{Command, Editor, State},
-    render,
+    event::{Event},
+    render, 
 };
 
-use sdl2::event::Event;
 pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command>, ()> {
-    debug!("commands_of_event {:?}", &event);
+    debug!("commands_of_event {:?}", event);
     let res = match &mut state.editor {
         &mut Editor::Bitmap(ref ed) => {
             // to do -- insert a name into each command that is unique,
             // but whose structure encodes a wallclock timestamp, among other sequence numbers.
-            super::bitmap::io::consume_input(event).map(|ed_cmds| {
+            bitmap::io::edit_commands_of_event(event).map(|ed_cmds| {
                 ed_cmds
                     .into_iter()
-                    .map(|ed_cmd| Command::Bitmap(super::bitmap::Command::Edit(ed_cmd)))
+                    .map(|ed_cmd| Command::Bitmap(bitmap::Command::Edit(ed_cmd)))
                     .collect()
             })
         }
@@ -66,15 +67,11 @@ pub fn init_state() -> State {
     state_init
 }
 
-use sdl2::render::{Canvas, RenderTarget};
-pub fn render_elms<T: RenderTarget>(
-    canvas: &mut Canvas<T>,
-    state: &State,
-) -> Result<render::Elms, String> {
+pub fn render_elms(state: &State) -> Result<render::Elms, String> {
     match &state.editor {
         &Editor::Bitmap(ref ed) => match ed.state {
             None => Ok(vec![]),
-            Some(ref ed) => super::bitmap::io::render_elms(canvas, ed),
+            Some(ref ed) => super::bitmap::io::render_elms(ed),
         },
         &Editor::Chain(ref _ch) => unimplemented!(),
         &Editor::Grid(ref _gr) => unimplemented!(),

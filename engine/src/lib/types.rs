@@ -20,7 +20,17 @@ pub mod lang {
         Named(Name, Box<Media>),
         Located(Location, Box<Media>),
         Merkle(Merkle<Media>),
+        /// quoted code is media
+        Quote(Box<Exp>),
     }
+
+    /*
+    Possible idea: 
+    Introduce LISP-like quotes in a type-theoretic way,
+    a la a dual-context, modal interpretation of quoting;
+    see Georgios Alexandros Kavvos's arxiv paper on 
+    "intensionality and intensional recursion, and the Godel-Lob axiom", 2017.
+    */
 
     /// We lift Media to an expression language, with media operations, and adapton operations
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -40,6 +50,10 @@ pub mod lang {
         Named(Name, Box<Exp>),
         Located(Location, Box<Exp>),
         Merkle(Merkle<Exp>),
+        /// Quoted code is media
+        Quote(Box<Exp>),
+        /// Intensional recursion
+        FixQuote(Name, Box<Exp>),
         //----------------------------------------------------------------
         // Expression forms (whose evaluation produces Media):
         //----------------------------------------------------------------
@@ -293,31 +307,68 @@ pub mod adapton {
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-pub mod render {
-    use sdl2::pixels::Color;
+/// system input
+pub mod event {
+    use serde::{Deserialize, Serialize};
 
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub enum Event {
+        Quit,
+        KeyDown(KeyEventInfo),
+        KeyPress(KeyEventInfo),
+        KeyUp(KeyEventInfo),
+    }
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub struct KeyEventInfo {
+        pub key: String,
+        pub alt: bool,
+        pub ctrl: bool,
+        pub meta: bool,
+        pub shift: bool,
+    }
+}
+
+/// system output
+pub mod render {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub enum Color {
+        RGB(usize, usize, usize),
+    }
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Dim {
         pub width: usize,
         pub height: usize,
     }
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Pos {
         pub x: usize,
         pub y: usize,
     }
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Rect {
         pub pos: Pos,
         pub dim: Dim,
     }
+    impl Rect {
+        pub fn new (x:usize, y:usize, w:usize, h:usize) -> Rect {
+            Rect{ pos: Pos{x, y}, dim: Dim{ width:w, height:h } }
+        }
+    }
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Node {
         pub rect: Rect,
         pub fill: Fill,
         pub children: Elms,
     }
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub enum Fill {
         Open(Color, usize), // border width
         Closed(Color),
         None,
     }
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub enum Elm {
         Rect(Rect, Fill),
         Node(Box<Node>),
@@ -325,6 +376,7 @@ pub mod render {
     pub type Elms = Vec<Elm>;
 }
 
+/// Deprecated?
 pub mod util {
     use super::lang::{Atom, Name};
 

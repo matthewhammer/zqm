@@ -17,13 +17,22 @@ extern crate structopt;
 use structopt::StructOpt;
 
 use std::io;
+use sdl2::event::Event as SysEvent;
+use sdl2::keyboard::Keycode;
 
 // Unix OS:
 //use std::process::Command as UnixCommand;
 
 // ZQM:
-extern crate zoom_quilt_maker;
-use zoom_quilt_maker::{eval, types};
+extern crate zqm_engine;
+use zqm_engine::{eval, 
+                 bitmap,
+                 types::{
+                     self,
+                     event,
+                     lang::{Command, Editor, State},
+                     render,
+                 }};
 
 /// zoom-quilt-maker
 #[derive(StructOpt, Debug)]
@@ -78,9 +87,54 @@ fn init_log(level_filter: log::LevelFilter) {
         .init();
 }
 
+use sdl2::render::{Canvas, RenderTarget};
+pub fn draw_elms<T: RenderTarget>(
+    canvas: &mut Canvas<T>,
+    elms: &render::Elms,
+) -> Result<(), String> {
+    // to do -- draw elements onto the canvas, one by one
+    Ok(())
+}
+
+fn translate_system_event(event:SysEvent) -> Option<event::Event> {
+    match &event {        
+        SysEvent::Quit { .. }
+        | SysEvent::KeyDown {
+            keycode: Some(Keycode::Escape),
+            ..
+            } 
+        => {
+            Some(event::Event::Quit)
+        },        
+        SysEvent::KeyDown {
+            keycode: Some(ref kc),
+            ..
+        } => {
+            let key = match &kc {
+                Keycode::Space => " ".to_string(),
+                Keycode::Left => "ArrowLeft".to_string(),
+                Keycode::Right => "ArrowRight".to_string(),
+                Keycode::Up => "ArrowUp".to_string(),
+                Keycode::Down => "ArrowDown".to_string(),
+                keycode => format!("unrecognized({:?})", keycode)
+            };
+            let event = event::Event::KeyDown(event::KeyEventInfo{
+                key:key,
+                // to do -- translate modifier keys, 
+                alt:false,
+                ctrl:false,
+                meta:false,
+                shift:false,
+            });
+            Some(event)
+        },
+        _ => None,
+    }
+}
+
 pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     use sdl2::event::EventType;
-    //use sdl2::keyboard::Keycode;
+    use sdl2::keyboard::Keycode;
 
     let grid_size = (16, 16);
     let zoom = 32u32;
@@ -117,7 +171,11 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     event_pump.disable_event(EventType::MouseMotion);
 
     'running: loop {
-        let event = event_pump.wait_event();
+        let event = translate_system_event(event_pump.wait_event());
+        let event = match event {
+            None => continue 'running,
+            Some(event) => event,
+        };
         match eval::commands_of_event(state, &event) {
             Ok(commands) => {
                 for c in commands.iter() {
@@ -125,8 +183,8 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
                     // todo -- we do nothing with the result; we should log it.
                     eval::command_eval(state, c)?;
                 }
-                let elms = eval::render_elms(&mut canvas, state)?;
-                // todo actually render them
+                let elms = eval::render_elms(state)?;
+                draw_elms(&mut canvas, &elms)?;
                 drop(elms);
             }
             Err(()) => break 'running,
@@ -134,6 +192,8 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     }
     Ok(())
 }
+
+
 
 fn main() {
     let cliopt = CliOpt::from_args();

@@ -4,9 +4,6 @@ extern crate log;
 extern crate serde;
 extern crate serde_bytes;
 
-// SDL: Keyboard/mouse input events, multi-media output abstractions:
-extern crate sdl2;
-
 extern crate hashcons;
 
 #[macro_use]

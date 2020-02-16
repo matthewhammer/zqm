@@ -39,6 +39,10 @@ of edges, respectively.
 
 mod algo {
     use super::*;
+    // todo -- rename these everywhere?
+    type ThunkNode = Thunk;
+    type RefNode = Ref;
+    type Edges = Vec<Edge>;
 
     pub fn dirty_ref(ctx: &mut Context, name:&Name, ref_node:&RefNode) {
         unimplemented!()
@@ -56,30 +60,33 @@ mod algo {
         unimplemented!()
     }
 
-    
-    fn add_back_edge(ctx: &mut Context, edge:&Edge) {
+    pub fn add_back_edges(ctx: &mut Context, edges:&Edges) {
         unimplemented!()
     }
 
-    fn rem_back_edge(ctx: &mut Context, edge:&Edge) {
-        unimplemented!()
-    }
-
-    fn add_back_edges(ctx: &mut Context, edges:&Edges) {
-        unimplemented!()
-    }
-    
-    fn rem_back_edges(ctx: &mut Context, edges:&Edges) {
+    pub fn rem_back_edges(ctx: &mut Context, edges:&Edges) {
         unimplemented!()
     }    
+    
+    pub fn add_back_edge(ctx: &mut Context, edge:&Edge) {
+        unimplemented!()
+    }
 
-    fn clean_edge(ctx:&mut Context, edge:&Edge) -> bool {
+    pub fn rem_back_edge(ctx: &mut Context, edge:&Edge) {
         unimplemented!()
     }
     
-    fn dirty_edge(ctx: &mut Context, edge: Edge) {
+    pub fn clean_edge(ctx:&mut Context, edge:&Edge) -> bool {
         unimplemented!()
     }
+    
+    pub fn dirty_edge(ctx: &mut Context, edge: Edge) {
+        unimplemented!()
+    }
+}
+
+pub fn init() -> Context {
+    unimplemented!()
 }
 
 pub fn put(ctx: &mut Context, name: Name, media: Media) -> Result<NodeId, PutError> {

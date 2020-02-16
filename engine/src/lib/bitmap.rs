@@ -280,49 +280,53 @@ pub mod semantics {
 
 pub mod io {
     use super::{Dir2D, EditCommand, EditorState};
-    use sdl2::event::Event;
-    use types::render;
+    use types::event::Event;
+    use types::render::{self, Color, Rect, Elm, Elms, Fill};
 
-    pub fn consume_input(event: &Event) -> Result<Vec<EditCommand>, ()> {
-        use sdl2::keyboard::Keycode;
-        match &event {
-            Event::Quit { .. }
-            | Event::KeyDown {
-                keycode: Some(Keycode::Escape),
-                ..
-            } => Err(()),
-            Event::KeyDown {
-                keycode: Some(ref kc),
-                ..
-            } => match &kc {
-                Keycode::Space => Ok(vec![EditCommand::Toggle]),
-                Keycode::Left => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
-                Keycode::Right => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
-                Keycode::Up => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
-                Keycode::Down => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
-                _ => Ok(vec![]),
+    pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
+        match event {
+            &Event::Quit { .. } => Err(()),
+            &Event::KeyDown(ref kei) => {
+                match kei.key.as_str() {
+                    " " => Ok(vec![EditCommand::Toggle]),
+                    "ArrowLeft"  => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
+                    "ArrowRight" => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
+                    "ArrowUp"    => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
+                    "ArrowDown"  => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
+                    _ => Ok(vec![]),
+                }
             },
             _ => Ok(vec![]),
         }
     }
 
-    use sdl2::render::{Canvas, RenderTarget};
-    pub fn render_elms<T: RenderTarget>(
-        canvas: &mut Canvas<T>,
-        edit_state: &EditorState,
-    ) -> Result<render::Elms, String> {
-        let out: render::Elms = vec![];
-        use sdl2::pixels::Color;
-        use sdl2::rect::Rect;
+    struct Out {
+        pub elms:Elms
+    }
+    impl Out {
+        pub fn new() -> Out {
+            Out{ elms: vec![] }
+        }
+        pub fn add_rect(&mut self, r:&Rect, f:Fill) {
+            self.elms.push(Elm::Rect(r.clone(), f))
+        }
+    }
 
-        let zoom = 32 as usize;
+    //use sdl2::render::{Canvas, RenderTarget};
+    pub fn render_elms(edit_state: &EditorState) -> Result<render::Elms, String> {
+
+        let mut out: Out = Out::new();
+
         let (width, height) = super::semantics::bitmap_get_size(&edit_state.bitmap);
-        let border_width = 2 as usize;
 
+        // to do -- get these constants from the editor state
+        let zoom = 32 as usize;
+        let border_width = 2 as usize;
         let grid_border_color = Color::RGB(100, 80, 100);
         let cursor_border_color = Color::RGB(150, 255, 150);
 
         fn get_cell_color(is_set: bool, is_focus: bool) -> Color {
+            // to do -- get these constants from the editor state
             // cell colors, based on two bits:
             let color_notset_notfocus = Color::RGB(0, 0, 0);
             let color_notset_isfocus = Color::RGB(0, 100, 0);
@@ -337,42 +341,38 @@ pub mod io {
         };
 
         let cursor_rect = Rect::new(
-            (edit_state.cursor.0 * zoom) as i32 - border_width as i32,
-            (edit_state.cursor.1 * zoom) as i32 - border_width as i32,
-            (zoom + border_width * 2) as u32,
-            (zoom + border_width * 2) as u32,
+            (edit_state.cursor.0 * zoom) - border_width,
+            (edit_state.cursor.1 * zoom) - border_width,
+            (zoom + border_width * 2),
+            (zoom + border_width * 2),
         );
 
         // grid border is a single background rect:
-        canvas.set_draw_color(grid_border_color);
-        canvas.fill_rect(Rect::new(
+        let grid_rect = Rect::new(
             0,
             0,
-            (width * zoom + border_width) as u32,
-            (height * zoom + border_width) as u32,
-        ))?;
-        canvas.set_draw_color(cursor_border_color);
-        canvas.fill_rect(cursor_rect)?;
+            width * zoom + border_width,
+            height * zoom + border_width,
+        );
+        out.add_rect(&grid_rect, Fill::Closed(grid_border_color.clone()));
+        out.add_rect(&cursor_rect, Fill::Closed(cursor_border_color.clone()));
+
         // grid cells are rects:
         for x in 0..width {
             for y in 0..height {
                 let cell_rect = Rect::new(
-                    (x * zoom + border_width) as i32,
-                    (y * zoom + border_width) as i32,
-                    (zoom as i32 - (border_width * 2) as i32) as u32,
-                    (zoom as i32 - (border_width * 2) as i32) as u32,
+                    x * zoom + border_width,
+                    y * zoom + border_width,
+                    zoom - border_width * 2,
+                    zoom - border_width * 2,
                 );
                 let bit =
                     super::semantics::bitmap_get_bit(&edit_state.bitmap, x as usize, y as usize);
                 let cell_color = get_cell_color(bit, (x as usize, y as usize) == edit_state.cursor);
-                canvas.set_draw_color(cell_color);
-                canvas.fill_rect(cell_rect)?;
-                canvas.set_draw_color(grid_border_color);
-                canvas.draw_rect(cell_rect)?;
+                out.add_rect(&cell_rect, Fill::Closed(cell_color.clone()));
+                out.add_rect(&cell_rect, Fill::Open(grid_border_color.clone(), 1));
             }
         }
-        canvas.present();
-        // todo
-        Ok(out)
+        Ok(out.elms)
     }
 }
