@@ -17,15 +17,24 @@ pub fn main() -> Result<(), JsValue> {
     let document = window.document().expect("should have a document on window");
 
     let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
-        let msg : JsValue = format!("{:?}", event).into();
+
+        let msg : JsValue = format!(
+            "{} {} {} {} {} {}",
+            event.key(),
+            event.code(),
+            event.shift_key(),
+            event.ctrl_key(),
+            alt_key(),
+            meta_key()
+        ).into();
         console::log_1(&msg);
     }) as Box<dyn FnMut(_)>);
-    
+
     document.set_onkeypress(Some(closure.as_ref().unchecked_ref()));
     document.set_onkeydown(Some(closure.as_ref().unchecked_ref()));
     document.set_onkeyup(Some(closure.as_ref().unchecked_ref()));
     document.set_oninput(Some(closure.as_ref().unchecked_ref()));
-    
+
     closure.forget();
 
     Ok(())
