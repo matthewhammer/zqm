@@ -1,6 +1,6 @@
 # ZQM Web Shell
 
-A Rust-based web console for a Zoom Quilt Maker.
+A Rust-based web shell for ZQM.
 
 
 ### Based on example project from wasm-bindgen: _Without a Bundler_

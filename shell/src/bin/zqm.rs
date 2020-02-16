@@ -185,15 +185,15 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     let video_subsystem = sdl_context.video()?;
     let window = video_subsystem
         .window(
-            "zoom-quilt-maker",
-            grid_size.0 * zoom + 1,
-            grid_size.1 * zoom + 1,
+            "zoom-quilt-machine",
+            grid_size.0 * (zoom + 4),
+            grid_size.1 * (zoom + 4),
         )
         .position_centered()
-        .resizable()
+        //.resizable()
         //.input_grabbed()
-        .fullscreen()
-        .fullscreen_desktop()
+        //.fullscreen()
+        //.fullscreen_desktop()
         .build()
         .map_err(|e| e.to_string())?;
 
