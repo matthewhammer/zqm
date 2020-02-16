@@ -322,6 +322,8 @@ pub mod io {
         // to do -- get these constants from the editor state
         let zoom = 32 as usize;
         let border_width = 2 as usize;
+        let cell_width = zoom + border_width * 2;
+
         let grid_border_color = Color::RGB(100, 80, 100);
         let cursor_border_color = Color::RGB(150, 255, 150);
 
@@ -341,18 +343,18 @@ pub mod io {
         };
 
         let cursor_rect = Rect::new(
-            (edit_state.cursor.0 * zoom) - border_width,
-            (edit_state.cursor.1 * zoom) - border_width,
-            (zoom + border_width * 2),
-            (zoom + border_width * 2),
+            edit_state.cursor.0 * cell_width,
+            edit_state.cursor.1 * cell_width,
+            cell_width,
+            cell_width
         );
 
         // grid border is a single background rect:
         let grid_rect = Rect::new(
             0,
             0,
-            width * zoom + border_width,
-            height * zoom + border_width,
+            width * cell_width,
+            height * cell_width,
         );
         out.add_rect(&grid_rect, Fill::Closed(grid_border_color.clone()));
         out.add_rect(&cursor_rect, Fill::Closed(cursor_border_color.clone()));
@@ -361,10 +363,10 @@ pub mod io {
         for x in 0..width {
             for y in 0..height {
                 let cell_rect = Rect::new(
-                    x * zoom + border_width,
-                    y * zoom + border_width,
-                    zoom - border_width * 2,
-                    zoom - border_width * 2,
+                    x * cell_width + border_width,
+                    y * cell_width + border_width,
+                    zoom,
+                    zoom,
                 );
                 let bit =
                     super::semantics::bitmap_get_bit(&edit_state.bitmap, x as usize, y as usize);

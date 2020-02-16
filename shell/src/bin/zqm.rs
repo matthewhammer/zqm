@@ -25,7 +25,7 @@ use sdl2::keyboard::Keycode;
 
 // ZQM:
 extern crate zqm_engine;
-use zqm_engine::{eval, 
+use zqm_engine::{eval,
                  bitmap,
                  types::{
                      self,
@@ -92,20 +92,62 @@ pub fn draw_elms<T: RenderTarget>(
     canvas: &mut Canvas<T>,
     elms: &render::Elms,
 ) -> Result<(), String> {
-    // to do -- draw elements onto the canvas, one by one
+    fn translate_color(c:&render::Color) -> sdl2::pixels::Color {
+        match c {
+            &render::Color::RGB(r, g, b) => {
+                sdl2::pixels::Color::RGB(
+                    r as u8,
+                    g as u8,
+                    b as u8
+                )
+            }
+        }
+    };
+    fn translate_rect(r:&render::Rect) -> sdl2::rect::Rect {
+        sdl2::rect::Rect::new(
+            r.pos.x as i32,
+            r.pos.y as i32,
+            r.dim.width as u32,
+            r.dim.height as u32
+        )
+    };
+    use zqm_engine::types::render::{Elm, Fill};
+    for elm in elms.iter() {
+        match &elm {
+            &Elm::Node(_) => {
+                unimplemented!()
+            }
+            &Elm::Rect(_r, Fill::None) => {
+                // do nothing
+            },
+            &Elm::Rect(r, Fill::Closed(c)) => {
+                let r = translate_rect(r);
+                let c = translate_color(c);
+                canvas.set_draw_color(c);
+                canvas.fill_rect(r);
+            },
+            &Elm::Rect(r, Fill::Open(c, width)) => {
+                assert_eq!(*width, 1);
+                let r = translate_rect(r);
+                let c = translate_color(c);
+                canvas.set_draw_color(c);
+                canvas.draw_rect(r);
+            },
+        }
+    };
     Ok(())
 }
 
 fn translate_system_event(event:SysEvent) -> Option<event::Event> {
-    match &event {        
+    match &event {
         SysEvent::Quit { .. }
         | SysEvent::KeyDown {
             keycode: Some(Keycode::Escape),
             ..
-            } 
+            }
         => {
             Some(event::Event::Quit)
-        },        
+        },
         SysEvent::KeyDown {
             keycode: Some(ref kc),
             ..
@@ -120,7 +162,7 @@ fn translate_system_event(event:SysEvent) -> Option<event::Event> {
             };
             let event = event::Event::KeyDown(event::KeyEventInfo{
                 key:key,
-                // to do -- translate modifier keys, 
+                // to do -- translate modifier keys,
                 alt:false,
                 ctrl:false,
                 meta:false,
@@ -185,6 +227,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
                 }
                 let elms = eval::render_elms(state)?;
                 draw_elms(&mut canvas, &elms)?;
+                canvas.present();
                 drop(elms);
             }
             Err(()) => break 'running,
