@@ -5,7 +5,7 @@ A [game-engine](https://en.wikipedia.org/wiki/Game_engine)-like system
   written in [Rust](https://www.rust-lang.org/),
   for the [Internet Computer](https://dfinity.org/faq).
 
-Initially, we focus on POC content-creation tools.
+Initially, we focus on [PoC](https://en.wikipedia.org/wiki/Proof_of_concept) content-creation tools.
 
 ### Initial steps (done):
 
@@ -20,3 +20,15 @@ Initially, we focus on POC content-creation tools.
 - [ ] Candid support: Recognize Candid types in a file or string.
 - [ ] Candid structure editor: Interactively build a value of a particular Candid type.
 - [ ] HTTP-client support: Connect to an IC canister holding saved media; send/receive media data to/from that canister.
+
+
+### See also: Existing _"zoom quilt"s already on the web:
+
+ - https://www.zoomquilt.org/
+
+ - https://zoomquilt2.com/
+
+ - https://arkadia.xyz/
+
+ - https://www.adultswim.com/etcetera/zoom/
+
