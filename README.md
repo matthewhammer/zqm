@@ -22,7 +22,7 @@ Initially, we focus on [PoC](https://en.wikipedia.org/wiki/Proof_of_concept) con
 - [ ] HTTP-client support: Connect to an IC canister holding saved media; send/receive media data to/from that canister.
 
 
-### See also: Existing Zoom Quilts are already on the web:
+### See also: Existing Zoom Quilts:
 
  - https://www.zoomquilt.org/
  - https://zoomquilt2.com/
