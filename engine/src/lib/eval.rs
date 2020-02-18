@@ -1,4 +1,4 @@
-// rename this module to 'engine'?
+// to-do/question: rename this module to 'engine'?
 
 use bitmap;
 pub use super::types::{
@@ -45,10 +45,6 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
     res
 }
 
-// to do: take "genesis" arguments:
-// - user's self-symbol abbreviation
-// - current date, time, place, etc
-// - OS filesystem paths for archiving
 pub fn init_state() -> State {
     let mut state_init = State {
         editor: super::types::lang::Editor::Bitmap(Box::new(crate::bitmap::Editor {
@@ -78,8 +74,6 @@ pub fn render_elms(state: &State) -> Result<render::Elms, String> {
     }
 }
 
-// ideally, this "string" should have a type refinement giving the
-// path abstractly as a name set, a la Fungi-Lang.
 pub fn get_persis_state_path() -> String {
     let dir: String = std::env::current_dir().unwrap().to_str().unwrap().into();
     format!("{}/zqm.json", dir)

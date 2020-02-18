@@ -4,38 +4,8 @@ use types::adapton::{
 };
 use types::lang::{Exp, Media, Name, Result as EvalResult};
 
-/** Cleaning and dirtying algorithms.
-
-The algorithms in this module are only used by Adapton, not
-externally.  They permit the main API to dirty and clean edges while
-enforcing certain invariants, given below.
-
-### Definitions:
-
-- An edge is either dirty or clean.
-
-- A thunk is dirty if and only if it has at least one outgoing dirty edge.
-
-- refs are never themselves dirty, but their dependent edges can be dirty,
-  encoding the situation when the ref changes to a new value (distinct
-  from at least some past action on this dirty edge).
-
-### Clean/dirty invariant
-
-the clean/dirty invariant for each edge is a global one, over the
-status of the entire graph:
-
- - if an edge `E` is dirty, then all its dependent
-   ("up-demand-dep"/incoming) edges are dirty too, `upFrom(E)`.
-
- - if an edge `E` is clean, then all of its dependencies
-   ("down-demand-dep"/outgoing) edges are clean `downFrom(E)`.
-
-These sets `upFrom(E)` and `downFrom(E)` give the transitive closure
-of edges by following the dependent direction, or dependency direction
-of edges, respectively.
-
-*/
+// See also: Adapton in Motoko:
+// https://github.com/matthewhammer/cleansheets/blob/master/src/adapton.mo
 
 mod algo {
     use super::*;
