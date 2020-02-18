@@ -1,7 +1,7 @@
 // rename this module to 'engine'?
 
 use bitmap;
-use super::types::{
+pub use super::types::{
     lang::{Command, Editor, State},
     event::{Event},
     render, 

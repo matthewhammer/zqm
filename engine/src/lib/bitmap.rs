@@ -288,6 +288,7 @@ pub mod io {
             &Event::Quit { .. } => Err(()),
             &Event::KeyDown(ref kei) => {
                 match kei.key.as_str() {
+                    "Escape"     => Err(()),
                     " " => Ok(vec![EditCommand::Toggle]),
                     "ArrowLeft"  => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
                     "ArrowRight" => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),

@@ -315,7 +315,6 @@ pub mod event {
     pub enum Event {
         Quit,
         KeyDown(KeyEventInfo),
-        KeyPress(KeyEventInfo),
         KeyUp(KeyEventInfo),
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]

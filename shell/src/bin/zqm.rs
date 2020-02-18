@@ -1,5 +1,5 @@
-// SDL: Keyboard/mouse input events, multi-media output abstractions:
 extern crate hashcons;
+extern crate serde;
 extern crate sdl2;
 
 // Logging:
@@ -7,11 +7,10 @@ extern crate sdl2;
 extern crate log;
 extern crate env_logger;
 
-extern crate serde;
-
 // CLI: Representation and processing:
 extern crate clap;
 use clap::Shell;
+
 
 extern crate structopt;
 use structopt::StructOpt;
@@ -20,13 +19,9 @@ use std::io;
 use sdl2::event::Event as SysEvent;
 use sdl2::keyboard::Keycode;
 
-// Unix OS:
-//use std::process::Command as UnixCommand;
-
 // ZQM:
 extern crate zqm_engine;
 use zqm_engine::{eval,
-                 bitmap,
                  types::{
                      self,
                      event,
@@ -204,6 +199,13 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
     info!("Using SDL_Renderer \"{}\"", canvas.info().name);
+
+    { // draw initial frame, before waiting for any events
+        let elms = eval::render_elms(state)?;
+        draw_elms(&mut canvas, &elms)?;
+        canvas.present();
+        drop(elms);
+    }
 
     let mut event_pump = sdl_context.event_pump()?;
 
