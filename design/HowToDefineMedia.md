@@ -67,9 +67,7 @@ and `Edit` command languages as a system of big-step evaluators.
 
 ## Step 6: Implement system IO for the `Editor`
 
-Implement system IO for the Editor, using SDL for system-level input
-on Mac/Linux.  This step translates system input events (keyboard
-press) to zero or more commands.  It translates editor states into
-`render` elements (types::render::Elms), for output.  ZQM uses a
-common module to translate these render elements into appropriate SDL
-drawing commands.
+Implement IO for the Editor:
+
+ - Accept input data of type Event (see types::event::Event).
+ - Produce output data of type Elms (see types::render::Elms).
