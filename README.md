@@ -2,7 +2,7 @@
 
 
 A [game-engine](https://en.wikipedia.org/wiki/Game_engine)-like system 
-  written in [Rust](https://www.rust-lang.org/);
+  written in [Rust](https://www.rust-lang.org/),
   for the [Internet Computer](https://dfinity.org/faq).
 
 Initially, we focus on POC content-creation tools.
