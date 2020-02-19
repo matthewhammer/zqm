@@ -128,6 +128,7 @@ pub fn main() -> Result<(), JsValue> {
                     },
                     Err(_) => {
                         // User is asking to escape; reset the state
+                        console_log(format!("resetting state..."));
                         state = eval::init_state();
                     }
                 }

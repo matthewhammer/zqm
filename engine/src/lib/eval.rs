@@ -10,7 +10,7 @@ pub use super::types::{
 pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command>, ()> {
     debug!("commands_of_event {:?}", event);
     let res = match &mut state.editor {
-        &mut Editor::Bitmap(ref ed) => {
+        &mut Editor::Bitmap(ref _ed) => {
             // to do -- insert a name into each command that is unique,
             // but whose structure encodes a wallclock timestamp, among other sequence numbers.
             bitmap::io::edit_commands_of_event(event).map(|ed_cmds| {
@@ -20,8 +20,8 @@ pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command
                     .collect()
             })
         }
-        &mut Editor::Chain(ref mut ed) => unimplemented!(),
-        &mut Editor::Grid(ref mut ed) => unimplemented!(),
+        &mut Editor::Chain(ref mut _ed) => unimplemented!(),
+        &mut Editor::Grid(ref mut _ed) => unimplemented!(),
     };
     debug!("commands_of_event {:?} ==> {:?}", event, res);
     res
