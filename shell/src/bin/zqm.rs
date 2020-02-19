@@ -25,7 +25,6 @@ use zqm_engine::{eval,
                  types::{
                      self,
                      event,
-                     lang::{Command, Editor, State},
                      render,
                  }};
 
@@ -119,14 +118,14 @@ pub fn draw_elms<T: RenderTarget>(
                 let r = translate_rect(r);
                 let c = translate_color(c);
                 canvas.set_draw_color(c);
-                canvas.fill_rect(r);
+                canvas.fill_rect(r).unwrap();
             },
             &Elm::Rect(r, Fill::Open(c, width)) => {
                 assert_eq!(*width, 1);
                 let r = translate_rect(r);
                 let c = translate_color(c);
                 canvas.set_draw_color(c);
-                canvas.draw_rect(r);
+                canvas.draw_rect(r).unwrap();
             },
         }
     };
@@ -171,7 +170,6 @@ fn translate_system_event(event:SysEvent) -> Option<event::Event> {
 
 pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     use sdl2::event::EventType;
-    use sdl2::keyboard::Keycode;
 
     let grid_size = (16, 16);
     let zoom = 32u32;
