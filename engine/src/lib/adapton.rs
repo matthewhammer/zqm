@@ -1,8 +1,8 @@
 use types::adapton::{
-    Action, Closure, Context, Edge, Env, LogEvent, LogEventTag, LogEvents, Node, NodeId, Ref,
+    Action, Closure, Context, Edge, LogEvent, LogEventTag, LogEvents, Node, NodeId, Ref,
     Stack, Store, Thunk,
 };
-use types::lang::{Exp, Media, Name, Result as EvalResult};
+use types::lang::{Media, Name, Result as EvalResult};
 
 // See also: Adapton in Motoko:
 // https://github.com/matthewhammer/cleansheets/blob/master/src/adapton.mo
@@ -14,42 +14,52 @@ mod algo {
     type RefNode = Ref;
     type Edges = Vec<Edge>;
 
+    #[allow(unused_variables, unused_mut)]
     pub fn dirty_ref(ctx: &mut Context, name:&Name, ref_node:&RefNode) {
         unimplemented!()
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn dirty_thunk(ctx: &mut Context, name:&Name, thunk_node:&ThunkNode) {
         unimplemented!()
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn thunk_is_dirty(t:&ThunkNode) -> bool {
         unimplemented!()
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn add_edge(ctx: &mut Context, target: &NodeId, action:&Action) {
         unimplemented!()
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn add_back_edges(ctx: &mut Context, edges:&Edges) {
         unimplemented!()
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn rem_back_edges(ctx: &mut Context, edges:&Edges) {
         unimplemented!()
-    }    
-    
+    }
+
+    #[allow(unused_variables, unused_mut)]
     pub fn add_back_edge(ctx: &mut Context, edge:&Edge) {
         unimplemented!()
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn rem_back_edge(ctx: &mut Context, edge:&Edge) {
         unimplemented!()
     }
-    
+
+    #[allow(unused_variables, unused_mut)]
     pub fn clean_edge(ctx:&mut Context, edge:&Edge) -> bool {
         unimplemented!()
     }
-    
+
+    #[allow(unused_variables, unused_mut)]
     pub fn dirty_edge(ctx: &mut Context, edge: Edge) {
         unimplemented!()
     }
@@ -59,10 +69,12 @@ pub fn init() -> Context {
     unimplemented!()
 }
 
+#[allow(unused_variables, unused_mut)]
 pub fn put(ctx: &mut Context, name: Name, media: Media) -> Result<NodeId, PutError> {
     unimplemented!()
 }
 
+#[allow(unused_variables, unused_mut)]
 pub fn put_thunk(
     ctx: &mut Context,
     name: Option<Name>,
@@ -71,14 +83,17 @@ pub fn put_thunk(
     unimplemented!()
 }
 
+#[allow(unused_variables, unused_mut)]
 pub fn get(ctx: &mut Context, name: Name, node: NodeId) -> Result<EvalResult, GetError> {
     unimplemented!()
 }
 
+#[allow(unused_variables, unused_mut)]
 pub fn enter_scope(ctx: &mut Context, name: Name) {
     unimplemented!()
 }
 
+#[allow(unused_variables, unused_mut)]
 pub fn leave_scope(ctx: &mut Context) {
     unimplemented!()
 }
@@ -95,6 +110,7 @@ impl Store {
         self.0.push((name, node));
         prev
     }
+    #[allow(unused_variables, unused_mut)]
     fn get(&self, name: &Name) -> Option<Node> {
         unimplemented!()
     }

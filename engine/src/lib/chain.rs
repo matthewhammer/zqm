@@ -29,38 +29,48 @@ pub type Res<R> = Result<R, AutoError>;
 pub type Unit = Res<()>;
 
 impl Chain {
+    #[allow(unused_variables, unused_mut)]
     pub fn insert_start(&mut self, name: Name, media: Media) -> Unit {
         unimplemented!()
     }
+    #[allow(unused_variables, unused_mut)]
     pub fn insert_end(&mut self, name: Name, media: Media) -> Unit {
         unimplemented!()
     }
+    #[allow(unused_variables, unused_mut)]
     pub fn insert_after(&mut self, name: Name, name_new: Name, media: Media) -> Unit {
         unimplemented!()
     }
+    #[allow(unused_variables, unused_mut)]
     pub fn insert_before(&mut self, name: Name, name_new: Name, media: Media) -> Unit {
         unimplemented!()
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn delete_start(&mut self) -> Res<Media> {
         unimplemented!()
     }
+    #[allow(unused_variables, unused_mut)]
     pub fn delete_end(&mut self) -> Res<Media> {
         unimplemented!()
     }
+    #[allow(unused_variables, unused_mut)]
     pub fn delete_after(&mut self, name: Name) -> Res<Media> {
         unimplemented!()
     }
+    #[allow(unused_variables, unused_mut)]
     pub fn delete_before(&mut self, name: Name) -> Res<Media> {
         unimplemented!()
     }
-
+    #[allow(unused_variables, unused_mut)]
     pub fn replace_start(&mut self, media: Media) -> Res<Media> {
         unimplemented!()
     }
+    #[allow(unused_variables, unused_mut)]
     pub fn replace_end(&mut self, media: Media) -> Res<Media> {
         unimplemented!()
     }
+    #[allow(unused_variables, unused_mut)]
     pub fn replace(&mut self, name: Name, media: Media) -> Res<Media> {
         unimplemented!()
     }
@@ -167,6 +177,7 @@ pub mod semantics {
     // todo -- if we instead assume a moved Command rather than a borrowed one, we avoid clone()s here?
     //         OTOH, if we use a borrow, the Command constructors are affine too, which can be annoying, esp for logging.
 
+    #[allow(unused_variables, unused_mut)]
     pub fn chain_eval(chain: &mut Chain, command: &AutoCommand) -> Res<Option<Media>> {
         trace!("chain_eval {:?} ...", command);
         use self::AutoCommand::*;
@@ -198,6 +209,7 @@ pub mod semantics {
         res
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn editor_state_eval(
         editor: &mut EditorState,
         command: &EditCommand,
@@ -206,6 +218,7 @@ pub mod semantics {
         unimplemented!()
     }
 
+    #[allow(unused_variables, unused_mut)]
     pub fn editor_eval(editor: &mut EditorState, command: &Command) -> Result<(), String> {
         trace!("editor_eval: {:?}", command);
         unimplemented!()
