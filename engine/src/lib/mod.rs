@@ -18,8 +18,8 @@ pub type GlyphMap = std::collections::HashMap<types::lang::Name, Glyph>;
 
 pub mod chain;
 pub mod grid;
-
 pub mod bitmap;
+pub mod consmenu;
 pub mod eval;
 pub mod glyph;
 pub mod types;
