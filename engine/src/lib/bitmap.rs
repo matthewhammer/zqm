@@ -281,21 +281,19 @@ pub mod semantics {
 pub mod io {
     use super::{Dir2D, EditCommand, EditorState};
     use types::event::Event;
-    use types::render::{self, Color, Rect, Elm, Elms, Fill};
+    use types::render::{self, Color, Elm, Elms, Fill, Rect};
 
     pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
         match event {
             &Event::Quit { .. } => Err(()),
-            &Event::KeyDown(ref kei) => {
-                match kei.key.as_str() {
-                    "Escape"     => Err(()),
-                    " " => Ok(vec![EditCommand::Toggle]),
-                    "ArrowLeft"  => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
-                    "ArrowRight" => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
-                    "ArrowUp"    => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
-                    "ArrowDown"  => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
-                    _ => Ok(vec![]),
-                }
+            &Event::KeyDown(ref kei) => match kei.key.as_str() {
+                "Escape" => Err(()),
+                " " => Ok(vec![EditCommand::Toggle]),
+                "ArrowLeft" => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
+                "ArrowRight" => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
+                "ArrowUp" => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
+                "ArrowDown" => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
+                _ => Ok(vec![]),
             },
             _ => Ok(vec![]),
         }
@@ -336,16 +334,11 @@ pub mod io {
             edit_state.cursor.0 * cell_width,
             edit_state.cursor.1 * cell_width,
             cell_width,
-            cell_width
+            cell_width,
         );
 
         // grid border is a single background rect:
-        let grid_rect = Rect::new(
-            0,
-            0,
-            width * cell_width,
-            height * cell_width,
-        );
+        let grid_rect = Rect::new(0, 0, width * cell_width, height * cell_width);
         out.add_rect(&grid_rect, Fill::Closed(grid_border_color.clone()));
         out.add_rect(&cursor_rect, Fill::Closed(cursor_border_color.clone()));
 

@@ -4,8 +4,8 @@ use bitmap;
 use menu;
 
 pub use super::types::{
+    event::Event,
     lang::{Command, Editor, State},
-    event::{Event},
     render,
 };
 
@@ -21,7 +21,7 @@ pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command
                     .map(|ed_cmd| Command::Bitmap(bitmap::Command::Edit(ed_cmd)))
                     .collect()
             })
-        },
+        }
         &mut Editor::Menu(ref _ed) => {
             // to do -- insert a name into each command that is unique,
             // but whose structure encodes a wallclock timestamp, among other sequence numbers.
@@ -31,7 +31,7 @@ pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command
                     .map(|ed_cmd| Command::Menu(menu::Command::Edit(ed_cmd)))
                     .collect()
             })
-        },
+        }
         &mut Editor::Chain(ref mut _ed) => unimplemented!(),
         &mut Editor::Grid(ref mut _ed) => unimplemented!(),
     };
@@ -54,9 +54,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
             super::menu::semantics::editor_eval(e, c)
         }
         (&Command::Menu(ref _c), _) => Err("menu editor expected menu command".to_string()),
-        (_, &mut Editor::Menu(ref mut _e)) => {
-            Err("menu command for non-menu editor".to_string())
-        }
+        (_, &mut Editor::Menu(ref mut _e)) => Err("menu command for non-menu editor".to_string()),
 
         (&Command::Chain(ref _ch), _) => unimplemented!(),
         (&Command::Grid(ref _gr), _) => unimplemented!(),
@@ -68,56 +66,46 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
 pub fn init_state() -> State {
     let (mut state_init, init_command) = {
         if false {
-            (State {
-                editor: super::types::lang::Editor::Bitmap(Box::new(crate::bitmap::Editor {
-                    state: None,
-                    history: vec![],
-                })),
-            },
-             Command::Bitmap(crate::bitmap::Command::Init(
-                 crate::bitmap::InitCommand::Make16x16,
-             ))
+            (
+                State {
+                    editor: super::types::lang::Editor::Bitmap(Box::new(crate::bitmap::Editor {
+                        state: None,
+                        history: vec![],
+                    })),
+                },
+                Command::Bitmap(crate::bitmap::Command::Init(
+                    crate::bitmap::InitCommand::Make16x16,
+                )),
             )
-        }
-        else {
-            use crate::types::lang::{Name, Atom};
-            use crate::menu::{self, MenuType, PrimType, MenuChoice};
+        } else {
+            use crate::menu::{self, MenuChoice, MenuType, PrimType};
+            use crate::types::lang::{Atom, Name};
 
-            let typ =
-                MenuType::Product(
-                    vec![
-                        (Name::Atom(Atom::String("a".to_string())),
-                         MenuType::Variant(
-                             vec![
-                                 ( Name::Atom(Atom::String("l".to_string())),
-                                   MenuType::Prim(PrimType::Nat)
-                                 ),
-                                 ( Name::Atom(Atom::String("r".to_string())),
-                                   MenuType::Prim(PrimType::Nat)
-                                 )
-                             ]
-                         ))
-                    ]
-                );
+            let typ = MenuType::Product(vec![(
+                Name::Atom(Atom::String("a".to_string())),
+                MenuType::Variant(vec![
+                    (
+                        Name::Atom(Atom::String("l".to_string())),
+                        MenuType::Prim(PrimType::Nat),
+                    ),
+                    (
+                        Name::Atom(Atom::String("r".to_string())),
+                        MenuType::Prim(PrimType::Nat),
+                    ),
+                ]),
+            )]);
 
-            (State {
-                editor: super::types::lang::Editor::Menu(
-                    Box::new(
-                        menu::Editor {
-                            state: None,
-                            history: vec![],
-                        }
-                    )
-                )
-            },
-             Command::Menu(
-                 menu::Command::Init(
-                     menu::InitCommand::Default(
-                         MenuChoice::Blank,
-                         typ
-                     )
-                 )
-             )
+            (
+                State {
+                    editor: super::types::lang::Editor::Menu(Box::new(menu::Editor {
+                        state: None,
+                        history: vec![],
+                    })),
+                },
+                Command::Menu(menu::Command::Init(menu::InitCommand::Default(
+                    MenuChoice::Blank,
+                    typ,
+                ))),
             )
         }
     };

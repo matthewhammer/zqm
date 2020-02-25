@@ -1,11 +1,10 @@
 use serde::{Deserialize, Serialize};
-use types::lang::Name;
 use std::rc::Rc;
+use types::lang::Name;
 
 pub type Text = String;
 pub type Nat = usize; // todo -- use a bignum rep
 pub type Label = Name;
-
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum MenuType {
@@ -20,7 +19,7 @@ pub enum MenuType {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum PrimType {
     Nat,
-    Text
+    Text,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -40,7 +39,7 @@ pub enum MenuChoice {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum Error {
     MenuTypeMismatch(MenuType, Tag), // found vs expected
-    Blank(Tag), // found blank vs expected completed 'tag'
+    Blank(Tag),                      // found blank vs expected completed 'tag'
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -56,7 +55,7 @@ pub enum Tag {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum InitCommand {
     //DefaultChoice(MenuChoice, MenuType)
-    Default(MenuChoice, MenuType)
+    Default(MenuChoice, MenuType),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -68,16 +67,16 @@ pub enum AutoCommand {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum EditCommand {
-    GotoRoot, // Escape
-    AutoFill,  // Tab
-    NextBlank, // ArrowDown
-    PrevBlank, // ArrowUp
-    VecInsertBlank, // Comma
-    VecInsertAuto, // Shift-Comma
-    VariantNext, // ArrowDown
-    VariantPrev, // ArrowUp
-    VariantAccept, // Enter
-    VariantReset, // Space
+    GotoRoot,           // Escape
+    AutoFill,           // Tab
+    NextBlank,          // ArrowDown
+    PrevBlank,          // ArrowUp
+    VecInsertBlank,     // Comma
+    VecInsertAuto,      // Shift-Comma
+    VariantNext,        // ArrowDown
+    VariantPrev,        // ArrowUp
+    VariantAccept,      // Enter
+    VariantReset,       // Space
     Choose(MenuChoice), // (no simple keybinding)
 }
 
@@ -102,14 +101,14 @@ pub enum MenuCtx {
 pub struct PosChoice<X> {
     before_choice: Vec<(MenuTree, MenuType)>,
     choice: Option<X>,
-    after_choice: Vec<(MenuTree, MenuType)>
+    after_choice: Vec<(MenuTree, MenuType)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct LabelChoice<X> {
     before_choice: Vec<(Label, MenuTree, MenuType)>,
     choice: Option<(Label, X)>,
-    after_choice: Vec<(Label, MenuTree, MenuType)>
+    after_choice: Vec<(Label, MenuTree, MenuType)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -127,11 +126,11 @@ pub enum MenuTree {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct MenuState {
     pub typ: Rc<MenuType>, // invariant: typ = unfocus(ctx, tree_typ);
-    pub ctx: MenuCtx, // invariant: see typ.
-    pub tree: MenuTree, // invariant: tree has type tree_typ.
+    pub ctx: MenuCtx,      // invariant: see typ.
+    pub tree: MenuTree,    // invariant: tree has type tree_typ.
     pub tree_typ: MenuType,
     pub choice: MenuChoice, // invariant: choice has type typ; choice = unfocus(ctx, tree);
-    // invariant: tree has type typ
+                            // invariant: tree has type typ
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -146,13 +145,10 @@ pub mod semantics {
     pub type Err = String;
     pub type Res = Result<(), Err>;
 
-    pub fn editor_eval(
-        menu: &mut Editor,
-        command: &Command,
-    ) -> Res {
+    pub fn editor_eval(menu: &mut Editor, command: &Command) -> Res {
         let res = match command {
             Command::Init(InitCommand::Default(ref default_choice, ref typ)) => {
-                menu.state = Some(MenuState{
+                menu.state = Some(MenuState {
                     typ: Rc::new(typ.clone()),
                     ctx: MenuCtx::Root,
                     tree: MenuTree::Blank(typ.clone()),
@@ -163,28 +159,23 @@ pub mod semantics {
             }
             Command::Edit(ref c) => match menu.state {
                 None => Err("Invalid editor state".to_string()),
-                Some(ref mut st) => state_eval_command(st, c)
-            }
-            Command::Auto(ref c) => {
-                unimplemented!()
-            }
+                Some(ref mut st) => state_eval_command(st, c),
+            },
+            Command::Auto(ref c) => unimplemented!(),
         };
         menu.history.push(command.clone());
         res
     }
 
-    pub fn state_eval_command(
-        menu: &mut MenuState,
-        command: &EditCommand,
-    ) -> Res {
+    pub fn state_eval_command(menu: &mut MenuState, command: &EditCommand) -> Res {
         match command {
             &EditCommand::GotoRoot => goto_root(menu),
             &EditCommand::AutoFill => {
                 let tree = auto_fill(&menu.typ, 1);
                 menu.tree = tree_union(&menu.tree, &tree);
                 Ok(())
-            },
-            &EditCommand::NextBlank => next_blank(menu).map(|_|()),
+            }
+            &EditCommand::NextBlank => next_blank(menu).map(|_| ()),
             &EditCommand::PrevBlank => unimplemented!(),
             &EditCommand::VecInsertBlank => {
                 assert_tree_tag(&menu.tree, &Tag::Vec)?;
@@ -194,7 +185,7 @@ pub mod semantics {
                 assert_tree_tag(&menu.tree, &Tag::Vec)?;
                 state_eval_command(menu, &EditCommand::VecInsertBlank)?;
                 state_eval_command(menu, &EditCommand::AutoFill)
-            },
+            }
             &EditCommand::VariantNext => {
                 assert_tree_tag(&menu.tree, &Tag::Variant)?;
                 next_subtree_choice(menu)
@@ -203,9 +194,7 @@ pub mod semantics {
                 assert_tree_tag(&menu.tree, &Tag::Variant)?;
                 ascend(menu)
             }
-            _ => {
-                unimplemented!()
-            }
+            _ => unimplemented!(),
         }
     }
 
@@ -215,21 +204,14 @@ pub mod semantics {
 
     pub fn tree_has_complete_choice(tree: &MenuTree) -> bool {
         match tree {
-            MenuTree::Product(trees) => {
-                unimplemented!()
-            }
-            MenuTree::Variant(choice) => {
-                match &choice.choice {
-                    None => false,
-                    Some((l, t_tt)) => tree_has_complete_choice(&t_tt.0)
-                }
-            }
-            _ => {
-                unimplemented!()
-            }
+            MenuTree::Product(trees) => unimplemented!(),
+            MenuTree::Variant(choice) => match &choice.choice {
+                None => false,
+                Some((l, t_tt)) => tree_has_complete_choice(&t_tt.0),
+            },
+            _ => unimplemented!(),
         }
     }
-
 
     pub fn ascend(menu: &mut MenuState) -> Res {
         unimplemented!()
@@ -237,7 +219,7 @@ pub mod semantics {
 
     pub fn goto_root(menu: &mut MenuState) -> Res {
         match menu.ctx {
-            MenuCtx::Root => { Ok(()) }
+            MenuCtx::Root => Ok(()),
             _ => {
                 ascend(menu)?;
                 goto_root(menu)
@@ -247,7 +229,7 @@ pub mod semantics {
 
     pub fn next_blank(menu: &mut MenuState) -> Result<MenuType, Err> {
         match menu.tree {
-            MenuTree::Blank(ref t) => { Ok(t.clone()) }
+            MenuTree::Blank(ref t) => Ok(t.clone()),
             _ => {
                 next_tree(menu)?;
                 next_blank(menu)
@@ -259,15 +241,13 @@ pub mod semantics {
         match next_subtree(menu) {
             Ok(()) => Ok(()),
             // Err case: Need to look for next tree in the context:
-            Err(_) => {
-                match next_sibling(menu) {
-                    Ok(()) => Ok(()),
-                    Err(_) => {
-                        ascend(menu)?;
-                        next_tree(menu)
-                    }
+            Err(_) => match next_sibling(menu) {
+                Ok(()) => Ok(()),
+                Err(_) => {
+                    ascend(menu)?;
+                    next_tree(menu)
                 }
-            }
+            },
         }
     }
 
@@ -290,9 +270,7 @@ pub mod semantics {
                     Err("no subtrees".to_string())
                 }
             }
-            _ => {
-                unimplemented!()
-            }
+            _ => unimplemented!(),
         }
     }
 
@@ -310,7 +288,7 @@ pub mod semantics {
                     Err("no siblings".to_string())
                 }
             }
-            _ => { unimplemented!() }
+            _ => unimplemented!(),
         }
     }
 
@@ -328,18 +306,15 @@ pub mod semantics {
         match next_subtree_choice(menu) {
             Ok(()) => Ok(()),
             // Err case: Need to look for next tree in the context:
-            Err(_) => {
-                match next_sibling_choice(menu) {
-                    Ok(()) => Ok(()),
-                    Err(_) => {
-                        ascend(menu)?;
-                        next_tree_choice(menu)
-                    }
+            Err(_) => match next_sibling_choice(menu) {
+                Ok(()) => Ok(()),
+                Err(_) => {
+                    ascend(menu)?;
+                    next_tree_choice(menu)
                 }
-            }
+            },
         }
     }
-
 
     pub fn tree_union(tree1: &MenuTree, tree2: &MenuTree) -> MenuTree {
         // todo -- assert that the blanks' types agree
@@ -351,26 +326,28 @@ pub mod semantics {
     }
 
     pub fn auto_fill(typ: &MenuType, depth: usize) -> MenuTree {
-        if depth == 0 { MenuTree::Blank(typ.clone()) } else {
+        if depth == 0 {
+            MenuTree::Blank(typ.clone())
+        } else {
             match typ {
                 &MenuType::Prim(PrimType::Nat) => MenuTree::Nat(0),
                 &MenuType::Prim(PrimType::Text) => MenuTree::Text("".to_string()),
                 &MenuType::Variant(ref labtyps) => {
-                    let after_choices : Vec<(Label, MenuTree, MenuType)> =
-                        labtyps.iter().map(
-                            |(l, lt)| (l.clone(), auto_fill(lt, depth - 1), lt.clone())
-                        ).collect();
-                    MenuTree::Variant(LabelChoice{
+                    let after_choices: Vec<(Label, MenuTree, MenuType)> = labtyps
+                        .iter()
+                        .map(|(l, lt)| (l.clone(), auto_fill(lt, depth - 1), lt.clone()))
+                        .collect();
+                    MenuTree::Variant(LabelChoice {
                         before_choice: vec![],
                         choice: None,
                         after_choice: after_choices,
                     })
                 }
                 &MenuType::Product(ref labtyps) => {
-                    let menus : Vec<(Label, MenuTree, MenuType)> =
-                        labtyps.iter().map(
-                            |(l, lt)| (l.clone(), auto_fill(lt, depth - 1), lt.clone())
-                        ).collect();
+                    let menus: Vec<(Label, MenuTree, MenuType)> = labtyps
+                        .iter()
+                        .map(|(l, lt)| (l.clone(), auto_fill(lt, depth - 1), lt.clone()))
+                        .collect();
                     MenuTree::Product(menus)
                 }
                 &MenuType::Vec(ref typ) => {
@@ -385,25 +362,24 @@ pub mod semantics {
                     MenuTree::Option(false, Box::new(tree), *typ.clone())
                 }
                 &MenuType::Tup(ref typs) => {
-                    let menus : Vec<(MenuTree, MenuType)> =
-                        typs.iter().map(
-                            |t| (auto_fill(t, depth - 1), t.clone())
-                        ).collect();
+                    let menus: Vec<(MenuTree, MenuType)> = typs
+                        .iter()
+                        .map(|t| (auto_fill(t, depth - 1), t.clone()))
+                        .collect();
                     MenuTree::Tup(menus)
                 }
             }
         }
     }
 
-    pub fn get_choice(menu:&MenuState) -> Result<MenuChoice, Error> {
-
+    pub fn get_choice(menu: &MenuState) -> Result<MenuChoice, Error> {
         #[allow(unused_variables, unused_mut)]
-        pub fn choice_of_ctx(ctx: &MenuCtx, local_choice:MenuChoice) -> Result<MenuChoice, Error> {
+        pub fn choice_of_ctx(ctx: &MenuCtx, local_choice: MenuChoice) -> Result<MenuChoice, Error> {
             unimplemented!()
         };
 
         #[allow(unused_variables, unused_mut)]
-        pub fn choice_of_tree(tree:&MenuTree) -> Result<MenuChoice, Error> {
+        pub fn choice_of_tree(tree: &MenuTree) -> Result<MenuChoice, Error> {
             unimplemented!()
         };
 
@@ -411,28 +387,25 @@ pub mod semantics {
         let choice = choice_of_ctx(&menu.ctx, choice)?;
         Ok(choice)
     }
-
 }
 
 pub mod io {
     use super::{EditCommand, MenuState};
-    use types::event::Event;
-    use types::render::{self, Color, Rect, Elm, Elms, Fill};
     use render::Out;
+    use types::event::Event;
+    use types::render::{self, Color, Elm, Elms, Fill, Rect};
 
     pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
         match event {
             &Event::Quit { .. } => Err(()),
-            &Event::KeyDown(ref kei) => {
-                match kei.key.as_str() {
-                    "Escape"     => Err(()),
-                    " " => Ok(vec![]),
-                    "ArrowLeft"  => Ok(vec![]),
-                    "ArrowRight" => Ok(vec![]),
-                    "ArrowUp"    => Ok(vec![]),
-                    "ArrowDown"  => Ok(vec![]),
-                    _ => Ok(vec![]),
-                }
+            &Event::KeyDown(ref kei) => match kei.key.as_str() {
+                "Escape" => Err(()),
+                " " => Ok(vec![]),
+                "ArrowLeft" => Ok(vec![]),
+                "ArrowRight" => Ok(vec![]),
+                "ArrowUp" => Ok(vec![]),
+                "ArrowDown" => Ok(vec![]),
+                _ => Ok(vec![]),
             },
             _ => Ok(vec![]),
         }

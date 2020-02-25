@@ -247,9 +247,9 @@ pub mod adapton {
         Editor,
     }
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-    pub struct Store ( pub Vec<(Name, Node)> );
+    pub struct Store(pub Vec<(Name, Node)>);
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-    pub struct Stack ( pub Vec<Name> );
+    pub struct Stack(pub Vec<Name>);
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Context {
         pub agent: Agent,
@@ -273,11 +273,7 @@ pub mod adapton {
         ) -> Result<NodeId, adapton::PutError> {
             adapton::put_thunk(self, name, closure)
         }
-        pub fn put(
-            &mut self,
-            name: Name,
-            media: Media,
-        ) -> Result<NodeId, adapton::PutError> {
+        pub fn put(&mut self, name: Name, media: Media) -> Result<NodeId, adapton::PutError> {
             adapton::put(self, name, media)
         }
         pub fn get(&mut self, name: Name, node: NodeId) -> Result<EvalResult, adapton::GetError> {
@@ -353,8 +349,14 @@ pub mod render {
         pub dim: Dim,
     }
     impl Rect {
-        pub fn new (x:usize, y:usize, w:usize, h:usize) -> Rect {
-            Rect{ pos: Pos{x, y}, dim: Dim{ width:w, height:h } }
+        pub fn new(x: usize, y: usize, w: usize, h: usize) -> Rect {
+            Rect {
+                pos: Pos { x, y },
+                dim: Dim {
+                    width: w,
+                    height: h,
+                },
+            }
         }
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
