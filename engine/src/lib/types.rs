@@ -1,6 +1,6 @@
 /// The ZQM language: abstract syntax
 pub mod lang {
-    use crate::{bitmap, chain, grid};
+    use crate::{bitmap, chain, grid, menu};
     use hashcons::merkle::Merkle;
     use serde::{Deserialize, Serialize};
 
@@ -25,10 +25,10 @@ pub mod lang {
     }
 
     /*
-    Possible idea: 
+    Possible idea:
     Introduce LISP-like quotes in a type-theoretic way,
     a la a dual-context, modal interpretation of quoting;
-    see Georgios Alexandros Kavvos's arxiv paper on 
+    see Georgios Alexandros Kavvos's arxiv paper on
     "intensionality and intensional recursion, and the Godel-Lob axiom", 2017.
     */
 
@@ -103,6 +103,7 @@ pub mod lang {
     #[derive(Debug, Serialize, Deserialize, Hash)]
     pub enum Editor {
         Bitmap(Box<bitmap::Editor>),
+        Menu(Box<menu::Editor>),
         Chain(Box<chain::Editor>),
         Grid(Box<grid::Editor>),
     }
@@ -111,6 +112,7 @@ pub mod lang {
     // for expressing scripts, etc; then we'd need to do substitution, or more env-passing, or both.
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub enum Command {
+        Menu(menu::Command),
         Bitmap(bitmap::Command),
         Chain(chain::Command),
         Grid(grid::Command),
