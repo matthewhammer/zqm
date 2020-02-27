@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use bitmap;
 use glyph;
 use types::{
-    lang::{Atom, Name, Dir2D},
-    render::{Node, Color, Pos, Dim, Elm, Elms, Fill, Rect},
+    lang::{Atom, Dir2D, Name},
+    render::{Color, Dim, Elm, Elms, Fill, Node, Pos, Rect},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -50,17 +50,17 @@ pub struct Render {
 impl Render {
     pub fn new() -> Render {
         Render {
-            frame:Frame{
+            frame: Frame {
                 name: Name::Void,
                 elms: vec![],
                 typ: FrameType::None,
             },
-            stack: vec![]
+            stack: vec![],
         }
     }
 
     pub fn begin(&mut self, name: &Name, typ: FrameType) {
-        let new_frame = Frame{
+        let new_frame = Frame {
             name: name.clone(),
             typ: typ,
             elms: vec![],
@@ -112,9 +112,7 @@ impl Render {
     pub fn name(&mut self, name: &Name, ta: &TextAtts) {
         match name {
             Name::Atom(a) => self.atom(a, ta),
-            _ => {
-                self.text(&format!("{:?}", name), ta)
-            }
+            _ => self.text(&format!("{:?}", name), ta),
         }
     }
 
@@ -150,53 +148,50 @@ impl Render {
     }
 }
 
-
-
-
-
-fn bounding_rect_of_elm(elm:&Elm) -> Rect {
+fn bounding_rect_of_elm(elm: &Elm) -> Rect {
     match elm {
         Elm::Node(node) => node.rect.clone(),
-        Elm::Rect(r, _) => r.clone()
+        Elm::Rect(r, _) => r.clone(),
     }
 }
 
-fn bounding_rect_of_elms(elms:&Elms) -> Rect {
-    use std::cmp::{min, max};
-    let mut bound = Rect::new(usize::max_value(), usize::max_value(),
-                              usize::min_value(), usize::min_value());
+fn bounding_rect_of_elms(elms: &Elms) -> Rect {
+    use std::cmp::{max, min};
+    let mut bound = Rect::new(
+        usize::max_value(),
+        usize::max_value(),
+        usize::min_value(),
+        usize::min_value(),
+    );
     for elm in elms.iter() {
         let rect = bounding_rect_of_elm(elm);
         bound.pos.x = min(bound.pos.x, rect.pos.x);
         bound.pos.y = min(bound.pos.y, rect.pos.y);
-        bound.dim.width
-            = max(bound.dim.width,
-                  bound.pos.x + rect.dim.width);
-        bound.dim.height
-            = max(bound.dim.height,
-                  bound.pos.y + rect.dim.height);
+        bound.dim.width = max(bound.dim.width, bound.pos.x + rect.dim.width);
+        bound.dim.height = max(bound.dim.height, bound.pos.y + rect.dim.height);
     }
     bound
 }
 
-fn reposition_rect(rect:&Rect, pos:Pos) -> Rect {
-    Rect{pos, dim:rect.dim.clone()}
-}
-
-fn reposition_elm(elm:&Elm, pos:Pos) -> Elm {
-    match elm {
-        Elm::Rect(r, f) =>
-            Elm::Rect(reposition_rect(r, pos), f.clone()),
-        Elm::Node(node) => {
-            Elm::Node(Box::new(Node{
-                rect:reposition_rect(&node.rect, pos),..*node.clone()
-            }))
-        }
+fn reposition_rect(rect: &Rect, pos: Pos) -> Rect {
+    Rect {
+        pos,
+        dim: rect.dim.clone(),
     }
 }
 
-fn reposition_elms(elms:&Elms, flow:FlowAtts) -> (Elms, Rect) {
-    let mut next_pos = Pos{ x:0, y:0 };
+fn reposition_elm(elm: &Elm, pos: Pos) -> Elm {
+    match elm {
+        Elm::Rect(r, f) => Elm::Rect(reposition_rect(r, pos), f.clone()),
+        Elm::Node(node) => Elm::Node(Box::new(Node {
+            rect: reposition_rect(&node.rect, pos),
+            ..*node.clone()
+        })),
+    }
+}
+
+fn reposition_elms(elms: &Elms, flow: FlowAtts) -> (Elms, Rect) {
+    let mut next_pos = Pos { x: 0, y: 0 };
     let mut elms_out = vec![];
     for elm in elms.iter() {
         elms_out.push(reposition_elm(elm, next_pos.clone()));
@@ -206,9 +201,9 @@ fn reposition_elms(elms:&Elms, flow:FlowAtts) -> (Elms, Rect) {
     (elms_out, rect_out)
 }
 
-fn elm_of_elms(name:Name, elms:Elms, rect:Rect) -> Elm {
-    fn node_of_elms(name:Name, elms:Elms, rect:Rect) -> Node {
-        Node{
+fn elm_of_elms(name: Name, elms: Elms, rect: Rect) -> Elm {
+    fn node_of_elms(name: Name, elms: Elms, rect: Rect) -> Node {
+        Node {
             name: name,
             rect: rect,
             fill: Fill::None,
@@ -218,12 +213,12 @@ fn elm_of_elms(name:Name, elms:Elms, rect:Rect) -> Elm {
     Elm::Node(Box::new(node_of_elms(name, elms, rect)))
 }
 
-fn elm_of_frame(frame:Frame) -> Elm {
+fn elm_of_frame(frame: Frame) -> Elm {
     match frame.typ {
         FrameType::None => {
             let rect = bounding_rect_of_elms(&frame.elms);
             elm_of_elms(frame.name, frame.elms, rect)
-        },
+        }
         FrameType::Flow(flow) => {
             let (elms, rect) = reposition_elms(&frame.elms, flow);
             elm_of_elms(frame.name, elms, rect)

@@ -3,15 +3,15 @@
 #[macro_use]
 extern crate log;
 
+extern crate hashcons;
 extern crate serde;
 extern crate serde_bytes;
-extern crate hashcons;
 
 // -------- eval semantics ---------
 
-pub mod types;
-pub mod init;
 pub mod eval;
+pub mod init;
+pub mod types;
 
 // to do: complete menu module
 pub mod menu;

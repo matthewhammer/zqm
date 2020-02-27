@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use types::lang::{Name};
+use types::lang::Name;
 
 pub type Text = String;
 pub type Nat = usize; // todo -- use a bignum rep
@@ -397,11 +397,13 @@ pub mod semantics {
 }
 
 pub mod io {
-    use super::{EditCommand, MenuState, MenuCtx, MenuTree, Label};
+    use super::{EditCommand, Label, MenuCtx, MenuState, MenuTree};
     use render::Render;
     use types::event::Event;
-    use types::{lang::{Name, Dir2D},
-                render::{Color, Elms, Dim}};
+    use types::{
+        lang::{Dir2D, Name},
+        render::{Color, Dim, Elms},
+    };
 
     pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
         match event {
@@ -421,71 +423,93 @@ pub mod io {
     }
 
     pub fn render_elms(menu: &MenuState) -> Result<Elms, String> {
-        use crate::render::{TextAtts, FrameType, FlowAtts};
+        use crate::render::{FlowAtts, FrameType, TextAtts};
 
         // eventually we get these atts from
         //  some environment-determined settings
-        fn text_atts() -> TextAtts { TextAtts{
-            zoom: 3,
-            color: Color::RGB(50, 200, 100),
-            glyph_dim: Dim{ width: 5, height: 5 },
-            glyph_flow: FlowAtts{
+        fn text_atts() -> TextAtts {
+            TextAtts {
+                zoom: 3,
+                color: Color::RGB(50, 200, 100),
+                glyph_dim: Dim {
+                    width: 5,
+                    height: 5,
+                },
+                glyph_flow: FlowAtts {
+                    dir: Dir2D::Right,
+                    padding: 1,
+                },
+            }
+        };
+        fn blank_atts() -> TextAtts {
+            TextAtts {
+                zoom: 3,
+                color: Color::RGB(100, 10, 100),
+                glyph_dim: Dim {
+                    width: 5,
+                    height: 5,
+                },
+                glyph_flow: FlowAtts {
+                    dir: Dir2D::Right,
+                    padding: 1,
+                },
+            }
+        };
+        fn ctx_flow() -> FlowAtts {
+            FlowAtts {
+                dir: Dir2D::Left,
+                padding: 2,
+            }
+        };
+        fn tree_flow() -> FlowAtts {
+            FlowAtts {
                 dir: Dir2D::Right,
+                padding: 2,
+            }
+        };
+        fn sub_flow() -> FlowAtts {
+            FlowAtts {
+                dir: Dir2D::Down,
                 padding: 1,
             }
-        }};
-        fn blank_atts() -> TextAtts{ TextAtts{
-            zoom: 3,
-            color: Color::RGB(100, 10, 100),
-            glyph_dim: Dim{ width: 5, height: 5 },
-            glyph_flow: FlowAtts{
-                dir: Dir2D::Right,
-                padding: 1,
-            }
-        }};
-        fn ctx_flow() -> FlowAtts{ FlowAtts{
-            dir: Dir2D::Left,
-            padding: 2,
-        }};
-        fn tree_flow() -> FlowAtts{ FlowAtts{
-            dir: Dir2D::Right,
-            padding: 2,
-        }};
-        fn sub_flow() -> FlowAtts{ FlowAtts{
-            dir: Dir2D::Down,
-            padding: 1,
-        }};
+        };
         // eventually we want smarter layout algorithms
-        fn tup_flow() -> FlowAtts { sub_flow() };
-        fn vec_flow() -> FlowAtts { sub_flow() };
-        fn menu_flow() ->FlowAtts { tree_flow() };
+        fn tup_flow() -> FlowAtts {
+            sub_flow()
+        };
+        fn vec_flow() -> FlowAtts {
+            sub_flow()
+        };
+        fn menu_flow() -> FlowAtts {
+            tree_flow()
+        };
 
-        fn render_product_label(label: &Label, r:&mut Render) {
+        fn render_product_label(label: &Label, r: &mut Render) {
             r.name(label, &text_atts());
             r.str("=", &text_atts());
         }
 
-        fn render_variant_label(label: &Label, r:&mut Render) {
+        fn render_variant_label(label: &Label, r: &mut Render) {
             r.str("#", &text_atts());
             r.name(label, &text_atts());
             r.str("=", &text_atts());
         }
 
         fn begin_item(r: &mut Render) {
-            let tree_flow = FlowAtts{
+            let tree_flow = FlowAtts {
                 dir: Dir2D::Right,
                 padding: 2,
             };
             r.begin(&Name::Void, FrameType::Flow(tree_flow))
         }
 
-        fn render_ctx(ctx: &MenuCtx, r:&mut Render) {
+        fn render_ctx(ctx: &MenuCtx, r: &mut Render) {
             info!("render_ctx({:?})", ctx);
             let mut next_ctx = None;
             match ctx {
                 &MenuCtx::Root => {
                     // to do.
-                },
+                }
                 &MenuCtx::Product(ref ch) => {
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
                     for (l, t, ty) in ch.before_choice.iter() {
@@ -493,7 +517,7 @@ pub mod io {
                         render_product_label(l, r);
                         render_tree(t, r);
                         r.end();
-                    };
+                    }
                     if let Some((ref l, ref ctx)) = ch.choice {
                         begin_item(r);
                         render_product_label(l, r);
@@ -506,9 +530,9 @@ pub mod io {
                         render_product_label(&l, r);
                         render_tree(t, r);
                         r.end();
-                    };
+                    }
                     r.end();
-                },
+                }
                 &MenuCtx::Variant(ref ch) => {
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
                     for (l, t, ty) in ch.before_choice.iter() {
@@ -516,7 +540,7 @@ pub mod io {
                         render_variant_label(&l, r);
                         render_tree(t, r);
                         r.end()
-                    };
+                    }
                     if let Some((ref l, ref ctx)) = ch.choice {
                         begin_item(r);
                         render_variant_label(l, r);
@@ -530,18 +554,12 @@ pub mod io {
                         render_variant_label(&l, r);
                         render_tree(t, r);
                         r.end()
-                    };
+                    }
                     r.end();
-                },
-                &MenuCtx::Option(flag, ref body) => {
-                    unimplemented!()
-                },
-                &MenuCtx::Vec(ref ch) => {
-                    unimplemented!()
-                },
-                &MenuCtx::Tup(ref ch) => {
-                    unimplemented!()
-                },
+                }
+                &MenuCtx::Option(flag, ref body) => unimplemented!(),
+                &MenuCtx::Vec(ref ch) => unimplemented!(),
+                &MenuCtx::Tup(ref ch) => unimplemented!(),
             };
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
             if let Some(ctx) = next_ctx {
@@ -552,7 +570,7 @@ pub mod io {
             };
         };
 
-        fn render_tree(tree: &MenuTree, r:&mut Render) {
+        fn render_tree(tree: &MenuTree, r: &mut Render) {
             info!("render_tree({:?}): begin", tree);
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             match tree {
@@ -563,9 +581,9 @@ pub mod io {
                         render_product_label(l, r);
                         render_tree(t, r);
                         r.end()
-                    };
+                    }
                     r.end()
-                },
+                }
                 &MenuTree::Variant(ref ch) => {
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
                     for (l, t, ty) in ch.before_choice.iter() {
@@ -573,7 +591,7 @@ pub mod io {
                         render_variant_label(l, r);
                         render_tree(t, r);
                         r.end()
-                    };
+                    }
                     if let Some((ref l, ref tree)) = ch.choice {
                         begin_item(r);
                         render_variant_label(l, r);
@@ -585,36 +603,32 @@ pub mod io {
                         render_variant_label(l, r);
                         render_tree(t, r);
                         r.end()
-                    };
+                    }
                     r.end()
-                },
+                }
                 &MenuTree::Option(flag, ref tree, ref typ) => {
-                    if flag { r.str("?", &text_atts()) };
+                    if flag {
+                        r.str("?", &text_atts())
+                    };
                     render_tree(&*tree, r)
-                },
+                }
                 &MenuTree::Vec(ref trees, ref _typ) => {
                     r.begin(&Name::Void, FrameType::Flow(vec_flow()));
                     for tree in trees.iter() {
                         render_tree(tree, r)
                     }
                     r.end();
-                },
+                }
                 &MenuTree::Tup(ref trees) => {
                     r.begin(&Name::Void, FrameType::Flow(tup_flow()));
                     for (tree, _typ) in trees.iter() {
                         render_tree(tree, r)
                     }
                     r.end();
-                },
-                &MenuTree::Blank(ref typ) => {
-                    r.str("__blank__", &blank_atts())
-                },
-                &MenuTree::Nat(n) => {
-                    r.text(&format!("{}", n), &text_atts())
-                },
-                &MenuTree::Text(ref t) => {
-                    r.text(t, &text_atts())
-                },
+                }
+                &MenuTree::Blank(ref typ) => r.str("__blank__", &blank_atts()),
+                &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
+                &MenuTree::Text(ref t) => r.text(t, &text_atts()),
             };
             info!("render_tree({:?}): end.", tree);
             r.end();
