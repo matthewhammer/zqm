@@ -281,7 +281,7 @@ pub mod semantics {
 pub mod io {
     use super::{Dir2D, EditCommand, EditorState};
     use types::event::Event;
-    use types::render::{self, Color, Elm, Elms, Fill, Rect};
+    use types::render::{self, Color, Fill, Rect};
 
     pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
         match event {
@@ -301,9 +301,9 @@ pub mod io {
 
     //use sdl2::render::{Canvas, RenderTarget};
     pub fn render_elms(edit_state: &EditorState) -> Result<render::Elms, String> {
-        use render::Out;
+        use render::Render;
 
-        let mut out: Out = Out::new();
+        let mut render: Render = Render::new();
 
         let (width, height) = super::semantics::bitmap_get_size(&edit_state.bitmap);
 
@@ -339,8 +339,8 @@ pub mod io {
 
         // grid border is a single background rect:
         let grid_rect = Rect::new(0, 0, width * cell_width, height * cell_width);
-        out.add_rect(&grid_rect, Fill::Closed(grid_border_color.clone()));
-        out.add_rect(&cursor_rect, Fill::Closed(cursor_border_color.clone()));
+        render.rect(&grid_rect, Fill::Closed(grid_border_color.clone()));
+        render.rect(&cursor_rect, Fill::Closed(cursor_border_color.clone()));
 
         // grid cells are rects:
         for x in 0..width {
@@ -354,10 +354,10 @@ pub mod io {
                 let bit =
                     super::semantics::bitmap_get_bit(&edit_state.bitmap, x as usize, y as usize);
                 let cell_color = get_cell_color(bit, (x as usize, y as usize) == edit_state.cursor);
-                out.add_rect(&cell_rect, Fill::Closed(cell_color.clone()));
-                out.add_rect(&cell_rect, Fill::Open(grid_border_color.clone(), 1));
+                render.rect(&cell_rect, Fill::Closed(cell_color.clone()));
+                render.rect(&cell_rect, Fill::Open(grid_border_color.clone(), 1));
             }
         }
-        Ok(out.elms)
+        Ok(render.into_elms())
     }
 }

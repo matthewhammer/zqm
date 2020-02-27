@@ -63,60 +63,6 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
     res
 }
 
-pub fn init_state() -> State {
-    let (mut state_init, init_command) = {
-        if false {
-            (
-                State {
-                    editor: super::types::lang::Editor::Bitmap(Box::new(crate::bitmap::Editor {
-                        state: None,
-                        history: vec![],
-                    })),
-                },
-                Command::Bitmap(crate::bitmap::Command::Init(
-                    crate::bitmap::InitCommand::Make16x16,
-                )),
-            )
-        } else {
-            use crate::menu::{self, MenuChoice, MenuType, PrimType};
-            use crate::types::lang::{Atom, Name};
-
-            let typ = MenuType::Product(vec![(
-                Name::Atom(Atom::String("a".to_string())),
-                MenuType::Variant(vec![
-                    (
-                        Name::Atom(Atom::String("l".to_string())),
-                        MenuType::Prim(PrimType::Nat),
-                    ),
-                    (
-                        Name::Atom(Atom::String("r".to_string())),
-                        MenuType::Prim(PrimType::Nat),
-                    ),
-                ]),
-            )]);
-
-            (
-                State {
-                    editor: super::types::lang::Editor::Menu(Box::new(menu::Editor {
-                        state: None,
-                        history: vec![],
-                    })),
-                },
-                Command::Menu(menu::Command::Init(menu::InitCommand::Default(
-                    MenuChoice::Blank,
-                    typ,
-                ))),
-            )
-        }
-    };
-    let r = command_eval(&mut state_init, &init_command);
-    match r {
-        Ok(()) => {}
-        Err(err) => eprintln!("Failed to initialize the editor: {:?}", err),
-    };
-    state_init
-}
-
 pub fn render_elms(state: &State) -> Result<render::Elms, String> {
     match &state.editor {
         &Editor::Bitmap(ref ed) => match ed.state {
@@ -145,7 +91,7 @@ pub fn load_state() -> State {
     let file = match File::open(path) {
         Ok(f) => f,
         Err(error) => match error.kind() {
-            ErrorKind::NotFound => return init_state(),
+            ErrorKind::NotFound => return crate::init::init_state(),
             _ => unreachable!(),
         },
     };

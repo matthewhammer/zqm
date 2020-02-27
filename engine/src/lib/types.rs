@@ -144,8 +144,8 @@ pub mod lang {
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum Name {
+        Void,
         Atom(Atom),
-        Option(Option<Box<Name>>),
         TaggedTuple(Box<Name>, Vec<Name>),
         Merkle(Merkle<Name>),
     }
@@ -327,6 +327,7 @@ pub mod event {
 
 /// system output
 pub mod render {
+    use super::lang::Name;
     use serde::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -361,6 +362,7 @@ pub mod render {
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Node {
+        pub name: Name,
         pub rect: Rect,
         pub fill: Fill,
         pub children: Elms,

@@ -108,8 +108,8 @@ pub fn draw_elms<T: RenderTarget>(
     use zqm_engine::types::render::{Elm, Fill};
     for elm in elms.iter() {
         match &elm {
-            &Elm::Node(_) => {
-                unimplemented!()
+            &Elm::Node(node) => {
+                draw_elms(canvas, &node.children)?;
             }
             &Elm::Rect(_r, Fill::None) => {
                 // do nothing
@@ -147,6 +147,7 @@ fn translate_system_event(event:SysEvent) -> Option<event::Event> {
             ..
         } => {
             let key = match &kc {
+                Keycode::Tab => "\t".to_string(),
                 Keycode::Space => " ".to_string(),
                 Keycode::Left => "ArrowLeft".to_string(),
                 Keycode::Right => "ArrowRight".to_string(),

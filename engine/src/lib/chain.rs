@@ -172,7 +172,6 @@ pub enum Command {
 pub mod semantics {
     //use super::{Chain, Command, AutoCommand, EditCommand, InitCommand, Editor, EditorState};
     use super::{AutoCommand, Chain, Command, EditCommand, EditorState, Media, Res};
-    use glyph::cap5x5::glyph_map;
 
     // todo -- if we instead assume a moved Command rather than a borrowed one, we avoid clone()s here?
     //         OTOH, if we use a borrow, the Command constructors are affine too, which can be annoying, esp for logging.
@@ -187,7 +186,6 @@ pub mod semantics {
         pub fn none(r: Res<()>) -> Res<Option<Media>> {
             r.map(|_| None)
         };
-        let _gm = glyph_map();
         let res = match &command {
             InsertStart(ref n, ref m) => none(chain.insert_start(n.clone(), m.clone())),
             DeleteStart => some(chain.delete_start()),

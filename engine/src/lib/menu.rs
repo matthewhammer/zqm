@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use types::lang::Name;
+use types::lang::{Name};
 
 pub type Text = String;
 pub type Nat = usize; // todo -- use a bignum rep
@@ -146,6 +146,7 @@ pub mod semantics {
     pub type Res = Result<(), Err>;
 
     pub fn editor_eval(menu: &mut Editor, command: &Command) -> Res {
+        info!("editor_eval({:?}) begin", command);
         let res = match command {
             Command::Init(InitCommand::Default(ref default_choice, ref typ)) => {
                 menu.state = Some(MenuState {
@@ -163,6 +164,7 @@ pub mod semantics {
             },
             Command::Auto(ref c) => unimplemented!(),
         };
+        info!("editor_eval({:?}) ==> {:?}", command, res);
         menu.history.push(command.clone());
         res
     }
@@ -257,6 +259,7 @@ pub mod semantics {
             MenuTree::Product(ref trees) => {
                 let mut trees = trees.clone();
                 if trees.len() > 0 {
+                    trees.rotate_left(1);
                     let (label, tree, tree_t) = trees.pop().unwrap();
                     menu.tree = tree;
                     menu.tree_typ = tree_t;
@@ -282,6 +285,7 @@ pub mod semantics {
             MenuCtx::Product(ref ctx) => {
                 if ctx.after_choice.len() > 0 {
                     let mut ctx = ctx.clone();
+                    ctx.after_choice.rotate_left(1);
                     let (label, tree, tree_typ) = ctx.after_choice.pop().unwrap();
                     unimplemented!()
                 } else {
@@ -321,7 +325,10 @@ pub mod semantics {
         match (tree1, tree2) {
             (&MenuTree::Blank(_), _) => tree2.clone(),
             (_, &MenuTree::Blank(_)) => tree2.clone(),
-            (_, _) => unimplemented!(),
+            (_, _) => {
+                info!("tree_union({:?}, {:?}) begin", tree1, tree2);
+                unimplemented!()
+            }
         }
     }
 
@@ -390,10 +397,11 @@ pub mod semantics {
 }
 
 pub mod io {
-    use super::{EditCommand, MenuState};
-    use render::Out;
+    use super::{EditCommand, MenuState, MenuCtx, MenuTree, Label};
+    use render::Render;
     use types::event::Event;
-    use types::render::{self, Color, Elm, Elms, Fill, Rect};
+    use types::{lang::{Name, Dir2D},
+                render::{Color, Elms, Dim}};
 
     pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
         match event {
@@ -401,17 +409,230 @@ pub mod io {
             &Event::KeyDown(ref kei) => match kei.key.as_str() {
                 "Escape" => Err(()),
                 " " => Ok(vec![]),
-                "ArrowLeft" => Ok(vec![]),
-                "ArrowRight" => Ok(vec![]),
-                "ArrowUp" => Ok(vec![]),
-                "ArrowDown" => Ok(vec![]),
+                "\t" => Ok(vec![EditCommand::AutoFill]),
+                "ArrowLeft" => Ok(vec![EditCommand::PrevBlank]),
+                "ArrowRight" => Ok(vec![EditCommand::NextBlank]),
+                "ArrowUp" => Ok(vec![EditCommand::PrevBlank]),
+                "ArrowDown" => Ok(vec![EditCommand::NextBlank]),
                 _ => Ok(vec![]),
             },
             _ => Ok(vec![]),
         }
     }
 
-    pub fn render_elms(menu: &MenuState) -> Result<render::Elms, String> {
-        unimplemented!()
+    pub fn render_elms(menu: &MenuState) -> Result<Elms, String> {
+        use crate::render::{TextAtts, FrameType, FlowAtts};
+
+        // eventually we get these atts from
+        //  some environment-determined settings
+        fn text_atts() -> TextAtts { TextAtts{
+            zoom: 3,
+            color: Color::RGB(50, 200, 100),
+            glyph_dim: Dim{ width: 5, height: 5 },
+            glyph_flow: FlowAtts{
+                dir: Dir2D::Right,
+                padding: 1,
+            }
+        }};
+        fn blank_atts() -> TextAtts{ TextAtts{
+            zoom: 3,
+            color: Color::RGB(100, 10, 100),
+            glyph_dim: Dim{ width: 5, height: 5 },
+            glyph_flow: FlowAtts{
+                dir: Dir2D::Right,
+                padding: 1,
+            }
+        }};
+        fn ctx_flow() -> FlowAtts{ FlowAtts{
+            dir: Dir2D::Left,
+            padding: 2,
+        }};
+        fn tree_flow() -> FlowAtts{ FlowAtts{
+            dir: Dir2D::Right,
+            padding: 2,
+        }};
+        fn sub_flow() -> FlowAtts{ FlowAtts{
+            dir: Dir2D::Down,
+            padding: 1,
+        }};
+        // eventually we want smarter layout algorithms
+        fn tup_flow() -> FlowAtts { sub_flow() };
+        fn vec_flow() -> FlowAtts { sub_flow() };
+        fn menu_flow() ->FlowAtts { tree_flow() };
+
+        fn render_product_label(label: &Label, r:&mut Render) {
+            r.name(label, &text_atts());
+            r.str("=", &text_atts());
+        }
+
+        fn render_variant_label(label: &Label, r:&mut Render) {
+            r.str("#", &text_atts());
+            r.name(label, &text_atts());
+            r.str("=", &text_atts());
+        }
+
+        fn begin_item(r: &mut Render) {
+            let tree_flow = FlowAtts{
+                dir: Dir2D::Right,
+                padding: 2,
+            };
+            r.begin(&Name::Void, FrameType::Flow(tree_flow))
+        }
+
+        fn render_ctx(ctx: &MenuCtx, r:&mut Render) {
+            info!("render_ctx({:?})", ctx);
+            let mut next_ctx = None;
+            match ctx {
+                &MenuCtx::Root => {
+                    // to do.
+                },
+                &MenuCtx::Product(ref ch) => {
+                    r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+                    for (l, t, ty) in ch.before_choice.iter() {
+                        begin_item(r);
+                        render_product_label(l, r);
+                        render_tree(t, r);
+                        r.end();
+                    };
+                    if let Some((ref l, ref ctx)) = ch.choice {
+                        begin_item(r);
+                        render_product_label(l, r);
+                        r.str(" ...", &text_atts());
+                        r.end();
+                        next_ctx = Some((*ctx).clone());
+                    };
+                    for (l, t, ty) in ch.after_choice.iter() {
+                        begin_item(r);
+                        render_product_label(&l, r);
+                        render_tree(t, r);
+                        r.end();
+                    };
+                    r.end();
+                },
+                &MenuCtx::Variant(ref ch) => {
+                    r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+                    for (l, t, ty) in ch.before_choice.iter() {
+                        begin_item(r);
+                        render_variant_label(&l, r);
+                        render_tree(t, r);
+                        r.end()
+                    };
+                    if let Some((ref l, ref ctx)) = ch.choice {
+                        begin_item(r);
+                        render_variant_label(l, r);
+                        r.str(" ...", &text_atts());
+                        render_ctx(&*ctx, r);
+                        r.end();
+                        next_ctx = Some((*ctx).clone());
+                    };
+                    for (l, t, ty) in ch.after_choice.iter() {
+                        begin_item(r);
+                        render_variant_label(&l, r);
+                        render_tree(t, r);
+                        r.end()
+                    };
+                    r.end();
+                },
+                &MenuCtx::Option(flag, ref body) => {
+                    unimplemented!()
+                },
+                &MenuCtx::Vec(ref ch) => {
+                    unimplemented!()
+                },
+                &MenuCtx::Tup(ref ch) => {
+                    unimplemented!()
+                },
+            };
+            // continue rendering the rest of the context, in whatever flow we are using for that purpose.
+            if let Some(ctx) = next_ctx {
+                info!("context continues...");
+                render_ctx(&ctx, r)
+            } else {
+                info!("context end: root.");
+            };
+        };
+
+        fn render_tree(tree: &MenuTree, r:&mut Render) {
+            info!("render_tree({:?}): begin", tree);
+            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            match tree {
+                &MenuTree::Product(ref fields) => {
+                    r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+                    for (l, t, ty) in fields.iter() {
+                        begin_item(r);
+                        render_product_label(l, r);
+                        render_tree(t, r);
+                        r.end()
+                    };
+                    r.end()
+                },
+                &MenuTree::Variant(ref ch) => {
+                    r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+                    for (l, t, ty) in ch.before_choice.iter() {
+                        begin_item(r);
+                        render_variant_label(l, r);
+                        render_tree(t, r);
+                        r.end()
+                    };
+                    if let Some((ref l, ref tree)) = ch.choice {
+                        begin_item(r);
+                        render_variant_label(l, r);
+                        render_tree(&tree.0, r);
+                        r.end();
+                    };
+                    for (l, t, ty) in ch.after_choice.iter() {
+                        begin_item(r);
+                        render_variant_label(l, r);
+                        render_tree(t, r);
+                        r.end()
+                    };
+                    r.end()
+                },
+                &MenuTree::Option(flag, ref tree, ref typ) => {
+                    if flag { r.str("?", &text_atts()) };
+                    render_tree(&*tree, r)
+                },
+                &MenuTree::Vec(ref trees, ref _typ) => {
+                    r.begin(&Name::Void, FrameType::Flow(vec_flow()));
+                    for tree in trees.iter() {
+                        render_tree(tree, r)
+                    }
+                    r.end();
+                },
+                &MenuTree::Tup(ref trees) => {
+                    r.begin(&Name::Void, FrameType::Flow(tup_flow()));
+                    for (tree, _typ) in trees.iter() {
+                        render_tree(tree, r)
+                    }
+                    r.end();
+                },
+                &MenuTree::Blank(ref typ) => {
+                    r.str("__blank__", &blank_atts())
+                },
+                &MenuTree::Nat(n) => {
+                    r.text(&format!("{}", n), &text_atts())
+                },
+                &MenuTree::Text(ref t) => {
+                    r.text(t, &text_atts())
+                },
+            };
+            info!("render_tree({:?}): end.", tree);
+            r.end();
+        };
+        info!("render_menu_begin");
+        let mut r = Render::new();
+        r.begin(&Name::Void, FrameType::Flow(menu_flow()));
+
+        r.begin(&Name::Void, FrameType::Flow(ctx_flow()));
+        render_ctx(&menu.ctx, &mut r);
+        r.end();
+
+        r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+        render_tree(&menu.tree, &mut r);
+        r.end();
+
+        r.end();
+        info!("render_menu_end");
+        Ok(r.into_elms())
     }
 }
