@@ -169,8 +169,8 @@ fn bounding_rect_of_elms(elms: &Elms) -> Rect {
         let rect = bounding_rect_of_elm(elm);
         bound.pos.x = min(bound.pos.x, rect.pos.x);
         bound.pos.y = min(bound.pos.y, rect.pos.y);
-        bound.dim.width = max(bound.dim.width, bound.pos.x + rect.dim.width);
-        bound.dim.height = max(bound.dim.height, bound.pos.y + rect.dim.height);
+        bound.dim.width = max(bound.dim.width, (rect.pos.x + rect.dim.width) - bound.pos.x);
+        bound.dim.height = max(bound.dim.height, (rect.pos.y + rect.dim.height) - bound.pos.y);
     }
     bound
 }

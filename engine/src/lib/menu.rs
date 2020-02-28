@@ -431,29 +431,29 @@ pub mod io {
             TextAtts {
                 zoom: 3,
                 fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
-                bg_fill: Fill::Closed(Color::RGB(0, 0, 0)),
+                bg_fill: Fill::None,
                 glyph_dim: Dim {
                     width: 5,
                     height: 5,
                 },
                 glyph_flow: FlowAtts {
                     dir: Dir2D::Right,
-                    padding: 1,
+                    padding: 3,
                 },
             }
         };
         fn blank_atts() -> TextAtts {
             TextAtts {
                 zoom: 3,
-                fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
-                bg_fill: Fill::Closed(Color::RGB(0, 0, 0)),
+                fg_fill: Fill::Closed(Color::RGB(255, 200, 200)),
+                bg_fill: Fill::Closed(Color::RGB(200, 0, 0)),
                 glyph_dim: Dim {
                     width: 5,
                     height: 5,
                 },
                 glyph_flow: FlowAtts {
                     dir: Dir2D::Right,
-                    padding: 1,
+                    padding: 3,
                 },
             }
         };
@@ -628,7 +628,7 @@ pub mod io {
                     }
                     r.end();
                 }
-                &MenuTree::Blank(ref typ) => r.str(">", &blank_atts()),
+                &MenuTree::Blank(ref typ) => r.str("__<blank>__", &blank_atts()),
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
                 &MenuTree::Text(ref t) => r.text(t, &text_atts()),
             };
