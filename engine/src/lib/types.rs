@@ -341,8 +341,8 @@ pub mod render {
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Pos {
-        pub x: usize,
-        pub y: usize,
+        pub x: isize,
+        pub y: isize,
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Rect {
@@ -350,7 +350,7 @@ pub mod render {
         pub dim: Dim,
     }
     impl Rect {
-        pub fn new(x: usize, y: usize, w: usize, h: usize) -> Rect {
+        pub fn new(x: isize, y: isize, w: usize, h: usize) -> Rect {
             Rect {
                 pos: Pos { x, y },
                 dim: Dim {

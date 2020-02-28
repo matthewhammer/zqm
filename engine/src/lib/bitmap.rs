@@ -331,8 +331,8 @@ pub mod io {
         };
 
         let cursor_rect = Rect::new(
-            edit_state.cursor.0 * cell_width,
-            edit_state.cursor.1 * cell_width,
+            (edit_state.cursor.0 * cell_width) as isize,
+            (edit_state.cursor.1 * cell_width) as isize,
             cell_width,
             cell_width,
         );
@@ -346,8 +346,8 @@ pub mod io {
         for x in 0..width {
             for y in 0..height {
                 let cell_rect = Rect::new(
-                    x * cell_width + border_width,
-                    y * cell_width + border_width,
+                    (x * cell_width + border_width) as isize,
+                    (y * cell_width + border_width) as isize,
                     zoom,
                     zoom,
                 );

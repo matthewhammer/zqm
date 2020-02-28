@@ -91,7 +91,12 @@ impl Render {
         let (width, height) = bitmap::semantics::bitmap_get_size(bm);
         for y in 0..height {
             for x in 0..width {
-                let cell_rect = Rect::new(x * ba.zoom, y * ba.zoom, ba.zoom, ba.zoom);
+                let cell_rect = Rect::new(
+                    (x * ba.zoom) as isize,
+                    (y * ba.zoom) as isize,
+                    ba.zoom,
+                    ba.zoom,
+                );
                 let bit = bitmap::semantics::bitmap_get_bit(bm, x as usize, y as usize);
                 let cell_fill = if bit {
                     ba.fill_isset.clone()
@@ -160,8 +165,8 @@ fn bounding_rect_of_elm(elm: &Elm) -> Rect {
 fn bounding_rect_of_elms(elms: &Elms) -> Rect {
     use std::cmp::{max, min};
     let mut bound = Rect::new(
-        usize::max_value(),
-        usize::max_value(),
+        isize::max_value(),
+        isize::max_value(),
         usize::min_value(),
         usize::min_value(),
     );
@@ -169,8 +174,14 @@ fn bounding_rect_of_elms(elms: &Elms) -> Rect {
         let rect = bounding_rect_of_elm(elm);
         bound.pos.x = min(bound.pos.x, rect.pos.x);
         bound.pos.y = min(bound.pos.y, rect.pos.y);
-        bound.dim.width = max(bound.dim.width, (rect.pos.x + rect.dim.width) - bound.pos.x);
-        bound.dim.height = max(bound.dim.height, (rect.pos.y + rect.dim.height) - bound.pos.y);
+        bound.dim.width = max(
+            bound.dim.width,
+            ((rect.pos.x + rect.dim.width as isize) - bound.pos.x) as usize,
+        );
+        bound.dim.height = max(
+            bound.dim.height,
+            ((rect.pos.y + rect.dim.height as isize) - bound.pos.y) as usize,
+        );
     }
     bound
 }
@@ -197,7 +208,20 @@ fn reposition_elms(elms: &Elms, flow: FlowAtts) -> (Elms, Rect) {
     let mut elms_out = vec![];
     for elm in elms.iter() {
         elms_out.push(reposition_elm(elm, next_pos.clone()));
-        next_pos.x += bounding_rect_of_elm(elm).dim.width + flow.padding;
+        match flow.dir {
+            Dir2D::Right => {
+                next_pos.x += (bounding_rect_of_elm(elm).dim.width + flow.padding) as isize
+            }
+            Dir2D::Left => {
+                next_pos.x -= (bounding_rect_of_elm(elm).dim.width + flow.padding) as isize
+            }
+            Dir2D::Down => {
+                next_pos.y += (bounding_rect_of_elm(elm).dim.height + flow.padding) as isize
+            }
+            Dir2D::Up => {
+                next_pos.y -= (bounding_rect_of_elm(elm).dim.height + flow.padding) as isize
+            }
+        }
     }
     let rect_out = bounding_rect_of_elms(&elms_out);
     (elms_out, rect_out)
