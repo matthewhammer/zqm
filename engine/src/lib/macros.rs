@@ -1,6 +1,6 @@
 macro_rules! parse_bit {
     ( $t:tt ) => {
-        $t as usize == 0
+        $t as usize != 0
     };
 }
 

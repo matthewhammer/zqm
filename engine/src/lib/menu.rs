@@ -431,7 +431,7 @@ pub mod io {
             TextAtts {
                 zoom: 3,
                 fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
-                bg_fill: Fill::None,
+                bg_fill: Fill::Closed(Color::RGB(30, 0, 0)),
                 glyph_dim: Dim {
                     width: 5,
                     height: 5,
@@ -446,7 +446,7 @@ pub mod io {
             TextAtts {
                 zoom: 3,
                 fg_fill: Fill::Closed(Color::RGB(255, 200, 200)),
-                bg_fill: Fill::Closed(Color::RGB(200, 0, 0)),
+                bg_fill: Fill::Closed(Color::RGB(100, 0, 0)),
                 glyph_dim: Dim {
                     width: 5,
                     height: 5,
