@@ -16,9 +16,14 @@ macro_rules! parse_glyph {
                   ]
               ),*
           ];
+          let height = v.len();
+          let width = v[0].len();
+          for w in v.iter() {
+              assert_eq!(w.len(), width);
+          };
           crate::bitmap::Bitmap {
-              width: v[0].len(),
-              height: v.len(),
+              width: width,
+              height: height,
               major: crate::bitmap::Major::Row,
               bits: v
           }

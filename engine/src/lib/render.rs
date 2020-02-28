@@ -17,7 +17,8 @@ pub struct BitmapAtts {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct TextAtts {
     pub zoom: usize,
-    pub color: Color,
+    pub fg_fill: Fill,
+    pub bg_fill: Fill,
     pub glyph_dim: Dim,
     pub glyph_flow: FlowAtts,
 }
@@ -82,13 +83,14 @@ impl Render {
     }
 
     pub fn rect(&mut self, r: &Rect, f: Fill) {
+        trace!("rect({:?}, {:?})", r, f);
         self.frame.elms.push(Elm::Rect(r.clone(), f))
     }
 
     pub fn bitmap(&mut self, bm: &bitmap::Bitmap, ba: &BitmapAtts) {
         let (width, height) = bitmap::semantics::bitmap_get_size(bm);
-        for x in 0..(width - 1) {
-            for y in 0..(height - 1) {
+        for y in 0..height {
+            for x in 0..width {
                 let cell_rect = Rect::new(x * ba.zoom, y * ba.zoom, ba.zoom, ba.zoom);
                 let bit = bitmap::semantics::bitmap_get_bit(bm, x as usize, y as usize);
                 let cell_fill = if bit {
@@ -127,8 +129,8 @@ impl Render {
         let gm = glyph::cap5x5::glyph_map();
         let ba = BitmapAtts {
             zoom: ta.zoom,
-            fill_isset: Fill::Closed(ta.color.clone()),
-            fill_notset: Fill::None,
+            fill_isset: ta.fg_fill.clone(),
+            fill_notset: ta.bg_fill.clone(),
         };
         self.begin(&Name::Void, FrameType::Flow(ta.glyph_flow.clone()));
         for c in text.chars() {
@@ -195,7 +197,7 @@ fn reposition_elms(elms: &Elms, flow: FlowAtts) -> (Elms, Rect) {
     let mut elms_out = vec![];
     for elm in elms.iter() {
         elms_out.push(reposition_elm(elm, next_pos.clone()));
-        next_pos.x += bounding_rect_of_elm(elm).dim.width;
+        next_pos.x += bounding_rect_of_elm(elm).dim.width + flow.padding;
     }
     let rect_out = bounding_rect_of_elms(&elms_out);
     (elms_out, rect_out)

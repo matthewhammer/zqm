@@ -81,6 +81,7 @@ fn init_log(level_filter: log::LevelFilter) {
 use sdl2::render::{Canvas, RenderTarget};
 pub fn draw_elms<T: RenderTarget>(
     canvas: &mut Canvas<T>,
+    pos: &render::Pos,
     elms: &render::Elms,
 ) -> Result<(), String> {
     fn translate_color(c: &render::Color) -> sdl2::pixels::Color {
@@ -88,10 +89,11 @@ pub fn draw_elms<T: RenderTarget>(
             &render::Color::RGB(r, g, b) => sdl2::pixels::Color::RGB(r as u8, g as u8, b as u8),
         }
     };
-    fn translate_rect(r: &render::Rect) -> sdl2::rect::Rect {
+    fn translate_rect(pos: &render::Pos, r: &render::Rect) -> sdl2::rect::Rect {
+        // todo -- clip the size of the rect dimension by the bound param
         sdl2::rect::Rect::new(
-            r.pos.x as i32,
-            r.pos.y as i32,
+            (pos.x + r.pos.x) as i32,
+            (pos.y + r.pos.y) as i32,
             r.dim.width as u32,
             r.dim.height as u32,
         )
@@ -100,20 +102,24 @@ pub fn draw_elms<T: RenderTarget>(
     for elm in elms.iter() {
         match &elm {
             &Elm::Node(node) => {
-                draw_elms(canvas, &node.children)?;
+                let pos = render::Pos {
+                    x: pos.x + node.rect.pos.x,
+                    y: pos.y + node.rect.pos.y,
+                };
+                draw_elms(canvas, &pos, &node.children)?;
             }
             &Elm::Rect(_r, Fill::None) => {
                 // do nothing
             }
             &Elm::Rect(r, Fill::Closed(c)) => {
-                let r = translate_rect(r);
+                let r = translate_rect(pos, r);
                 let c = translate_color(c);
                 canvas.set_draw_color(c);
                 canvas.fill_rect(r).unwrap();
             }
             &Elm::Rect(r, Fill::Open(c, width)) => {
                 assert_eq!(*width, 1);
-                let r = translate_rect(r);
+                let r = translate_rect(pos, r);
                 let c = translate_color(c);
                 canvas.set_draw_color(c);
                 canvas.draw_rect(r).unwrap();
@@ -190,7 +196,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     {
         // draw initial frame, before waiting for any events
         let elms = eval::render_elms(state)?;
-        draw_elms(&mut canvas, &elms)?;
+        draw_elms(&mut canvas, &render::Pos { x: 10, y: 10 }, &elms)?;
         canvas.present();
         drop(elms);
     }
@@ -216,7 +222,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
                     eval::command_eval(state, c)?;
                 }
                 let elms = eval::render_elms(state)?;
-                draw_elms(&mut canvas, &elms)?;
+                draw_elms(&mut canvas, &render::Pos { x: 10, y: 10 }, &elms)?;
                 canvas.present();
                 drop(elms);
             }

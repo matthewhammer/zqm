@@ -402,7 +402,7 @@ pub mod io {
     use types::event::Event;
     use types::{
         lang::{Dir2D, Name},
-        render::{Color, Dim, Elms},
+        render::{Color, Dim, Elms, Fill},
     };
 
     pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
@@ -430,7 +430,8 @@ pub mod io {
         fn text_atts() -> TextAtts {
             TextAtts {
                 zoom: 3,
-                color: Color::RGB(50, 200, 100),
+                fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
+                bg_fill: Fill::Closed(Color::RGB(0, 0, 0)),
                 glyph_dim: Dim {
                     width: 5,
                     height: 5,
@@ -444,7 +445,8 @@ pub mod io {
         fn blank_atts() -> TextAtts {
             TextAtts {
                 zoom: 3,
-                color: Color::RGB(100, 10, 100),
+                fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
+                bg_fill: Fill::Closed(Color::RGB(0, 0, 0)),
                 glyph_dim: Dim {
                     width: 5,
                     height: 5,
@@ -571,7 +573,7 @@ pub mod io {
         };
 
         fn render_tree(tree: &MenuTree, r: &mut Render) {
-            info!("render_tree({:?}): begin", tree);
+            //info!("render_tree({:?}): begin", tree);
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             match tree {
                 &MenuTree::Product(ref fields) => {
@@ -626,11 +628,11 @@ pub mod io {
                     }
                     r.end();
                 }
-                &MenuTree::Blank(ref typ) => r.str("__blank__", &blank_atts()),
+                &MenuTree::Blank(ref typ) => r.str(">", &blank_atts()),
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
                 &MenuTree::Text(ref t) => r.text(t, &text_atts()),
             };
-            info!("render_tree({:?}): end.", tree);
+            //info!("render_tree({:?}): end.", tree);
             r.end();
         };
         info!("render_menu_begin");

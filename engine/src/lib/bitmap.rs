@@ -156,18 +156,18 @@ pub mod semantics {
 
     pub fn bitmap_set_bit(bitmap: &mut Bitmap, x: usize, y: usize, b: bool) {
         match bitmap.major {
-            Major::Row => bitmap.bits[x][y] = b,
-            Major::Col => bitmap.bits[y][x] = b,
+            Major::Row => bitmap.bits[y][x] = b,
+            Major::Col => bitmap.bits[x][y] = b,
         };
         debug!("bitmap_set_bit({}, {}, {})", x, y, b);
     }
 
     pub fn bitmap_get_bit(bitmap: &Bitmap, x: usize, y: usize) -> bool {
         let b = match bitmap.major {
-            Major::Row => bitmap.bits[x][y],
-            Major::Col => bitmap.bits[y][x],
+            Major::Row => bitmap.bits[y][x],
+            Major::Col => bitmap.bits[x][y],
         };
-        trace!("bitmap_get_bit({}, {}) = {}", x, y, b);
+        debug!("bitmap_get_bit({}, {}) ==> {}", x, y, b);
         b
     }
 
@@ -178,7 +178,7 @@ pub mod semantics {
     pub fn bitmap_toggle_bit(bitmap: &mut Bitmap, x: usize, y: usize) -> bool {
         let b = bitmap_get_bit(bitmap, x, y);
         bitmap_set_bit(bitmap, x, y, !b);
-        debug!("bitmap_toggle_bit({}, {}) = {}", x, y, !b);
+        debug!("bitmap_toggle_bit({}, {}) ==> {}", x, y, !b);
         !b
     }
 
