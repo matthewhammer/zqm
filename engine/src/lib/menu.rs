@@ -411,7 +411,7 @@ pub mod io {
             &Event::KeyDown(ref kei) => match kei.key.as_str() {
                 "Escape" => Err(()),
                 " " => Ok(vec![]),
-                "\t" => Ok(vec![EditCommand::AutoFill]),
+                "Tab" => Ok(vec![EditCommand::AutoFill]),
                 "ArrowLeft" => Ok(vec![EditCommand::PrevBlank]),
                 "ArrowRight" => Ok(vec![EditCommand::NextBlank]),
                 "ArrowUp" => Ok(vec![EditCommand::PrevBlank]),
@@ -508,9 +508,10 @@ pub mod io {
         fn render_ctx(ctx: &MenuCtx, r: &mut Render) {
             info!("render_ctx({:?})", ctx);
             let mut next_ctx = None;
+            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             match ctx {
                 &MenuCtx::Root => {
-                    // to do.
+                    r.str("/", &text_atts());
                 }
                 &MenuCtx::Product(ref ch) => {
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
@@ -563,6 +564,7 @@ pub mod io {
                 &MenuCtx::Vec(ref ch) => unimplemented!(),
                 &MenuCtx::Tup(ref ch) => unimplemented!(),
             };
+            r.end();
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
             if let Some(ctx) = next_ctx {
                 info!("context continues...");

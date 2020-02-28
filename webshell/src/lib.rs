@@ -10,14 +10,15 @@ use std::rc::Rc;
 
 extern crate zqm_engine;
 use zqm_engine::{
-    eval,
+    eval, init,
     types::{
         event::{Event, KeyEventInfo},
         render,
     },
 };
 
-pub fn draw_elms(elms: &render::Elms) {
+pub fn draw_elms(pos: &render::Pos, elms: &render::Elms) {
+    // to do -- left this step outside of the recursion, for efficiency
     let document = web_sys::window().unwrap().document().unwrap();
     let canvas = document.get_element_by_id("canvas").unwrap();
     let canvas: web_sys::HtmlCanvasElement = canvas
@@ -41,10 +42,17 @@ pub fn draw_elms(elms: &render::Elms) {
             }
         }
     };
+
     use zqm_engine::types::render::{Elm, Fill};
     for elm in elms.iter() {
         match &elm {
-            &Elm::Node(_) => unimplemented!(),
+            &Elm::Node(node) => {
+                let pos = render::Pos {
+                    x: pos.x + node.rect.pos.x,
+                    y: pos.y + node.rect.pos.y,
+                };
+                draw_elms(&pos, &node.children)
+            }
             &Elm::Rect(_r, Fill::None) => {
                 // do nothing
             }
@@ -52,8 +60,8 @@ pub fn draw_elms(elms: &render::Elms) {
                 let c: JsValue = translate_color(c);
                 context.set_fill_style(&c);
                 context.fill_rect(
-                    r.pos.x as f64,
-                    r.pos.y as f64,
+                    (pos.x + r.pos.x) as f64,
+                    (pos.y + r.pos.y) as f64,
                     r.dim.width as f64,
                     r.dim.height as f64,
                 );
@@ -63,8 +71,8 @@ pub fn draw_elms(elms: &render::Elms) {
                 let c: JsValue = translate_color(c);
                 context.set_stroke_style(&c);
                 context.stroke_rect(
-                    r.pos.x as f64,
-                    r.pos.y as f64,
+                    (pos.x + r.pos.x) as f64,
+                    (pos.y + r.pos.y) as f64,
                     r.dim.width as f64,
                     r.dim.height as f64,
                 );
@@ -81,15 +89,18 @@ pub fn console_log(m: String) {
 // Called when the wasm module is instantiated
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue> {
-    let mut state = eval::init_state();
-    draw_elms(&eval::render_elms(&mut state).unwrap());
+    let mut state = init::init_state();
+    draw_elms(
+        &render::Pos { x: 0, y: 0 },
+        &eval::render_elms(&mut state).unwrap(),
+    );
     let state_cell = Rc::new(Cell::new(state));
     let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
-        let mut state: eval::State = state_cell.replace(eval::init_state());
+        let mut state: eval::State = state_cell.replace(init::init_state());
         let render_elms = {
             // translate each system event into zero, one or more in the engine's format.
             let events = match format!("{}", event.key()).as_str() {
-                "Escape" | "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | " " => {
+                "Tab" | "Escape" | "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | " " => {
                     vec![Event::KeyDown(KeyEventInfo {
                         key: event.key(),
                         alt: event.alt_key(),
@@ -121,7 +132,7 @@ pub fn main() -> Result<(), JsValue> {
                     Err(_) => {
                         // User is asking to escape; reset the state
                         console_log(format!("resetting state..."));
-                        state = eval::init_state();
+                        state = init::init_state();
                     }
                 }
             }
@@ -132,7 +143,7 @@ pub fn main() -> Result<(), JsValue> {
         // save updated state
         state_cell.set(state);
         // draw the engine elements onto the document's canvas element
-        draw_elms(&render_elms);
+        draw_elms(&render::Pos { x: 0, y: 0 }, &render_elms);
     }) as Box<dyn FnMut(_)>);
 
     let document = web_sys::window().unwrap().document().unwrap();

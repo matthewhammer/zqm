@@ -98,6 +98,31 @@ pub fn draw_elms<T: RenderTarget>(
             r.dim.height as u32,
         )
     };
+    fn draw_rect<T: RenderTarget>(
+        canvas: &mut Canvas<T>,
+        pos: &render::Pos,
+        r: &render::Rect,
+        f: &render::Fill,
+    ) {
+        match f {
+            Fill::None => {
+                // no-op.
+            }
+            Fill::Closed(c) => {
+                let r = translate_rect(pos, r);
+                let c = translate_color(c);
+                canvas.set_draw_color(c);
+                canvas.fill_rect(r).unwrap();
+            }
+            Fill::Open(c, 1) => {
+                let r = translate_rect(pos, r);
+                let c = translate_color(c);
+                canvas.set_draw_color(c);
+                canvas.draw_rect(r).unwrap();
+            }
+            Fill::Open(c, _) => unimplemented!(),
+        }
+    };
     use zqm_engine::types::render::{Elm, Fill};
     for elm in elms.iter() {
         match &elm {
@@ -106,23 +131,18 @@ pub fn draw_elms<T: RenderTarget>(
                     x: pos.x + node.rect.pos.x,
                     y: pos.y + node.rect.pos.y,
                 };
+                draw_rect::<T>(
+                    canvas,
+                    &pos,
+                    &render::Rect::new(0, 0, node.rect.dim.width, node.rect.dim.height),
+                    &node.fill,
+                );
                 draw_elms(canvas, &pos, &node.children)?;
             }
-            &Elm::Rect(_r, Fill::None) => {
-                // do nothing
-            }
-            &Elm::Rect(r, Fill::Closed(c)) => {
-                let r = translate_rect(pos, r);
-                let c = translate_color(c);
-                canvas.set_draw_color(c);
-                canvas.fill_rect(r).unwrap();
-            }
-            &Elm::Rect(r, Fill::Open(c, width)) => {
-                assert_eq!(*width, 1);
-                let r = translate_rect(pos, r);
-                let c = translate_color(c);
-                canvas.set_draw_color(c);
-                canvas.draw_rect(r).unwrap();
+            &Elm::Rect(r, f) => {
+                if true {
+                    draw_rect(canvas, pos, r, f)
+                }
             }
         }
     }
@@ -141,7 +161,7 @@ fn translate_system_event(event: SysEvent) -> Option<event::Event> {
             ..
         } => {
             let key = match &kc {
-                Keycode::Tab => "\t".to_string(),
+                Keycode::Tab => "Tab".to_string(),
                 Keycode::Space => " ".to_string(),
                 Keycode::Left => "ArrowLeft".to_string(),
                 Keycode::Right => "ArrowRight".to_string(),

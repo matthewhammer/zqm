@@ -204,8 +204,28 @@ fn reposition_elm(elm: &Elm, pos: Pos) -> Elm {
 }
 
 fn reposition_elms(elms: &Elms, flow: FlowAtts) -> (Elms, Rect) {
-    let mut next_pos = Pos { x: 0, y: 0 };
+    let bound = bounding_rect_of_elms(elms);
     let mut elms_out = vec![];
+
+    let mut next_pos = match flow.dir {
+        Dir2D::Right => Pos {
+            x: bound.pos.x,
+            y: bound.pos.y,
+        },
+        Dir2D::Down => Pos {
+            x: bound.pos.x,
+            y: bound.pos.y,
+        },
+        Dir2D::Left => Pos {
+            x: bound.pos.x + (bound.dim.width as isize),
+            y: bound.pos.y,
+        },
+        Dir2D::Up => Pos {
+            x: bound.pos.x,
+            y: bound.pos.y + (bound.dim.height as isize),
+        },
+    };
+
     for elm in elms.iter() {
         elms_out.push(reposition_elm(elm, next_pos.clone()));
         match flow.dir {
@@ -232,7 +252,8 @@ fn elm_of_elms(name: Name, elms: Elms, rect: Rect) -> Elm {
         Node {
             name: name,
             rect: rect,
-            fill: Fill::None,
+            //fill: Fill::None,
+            fill: Fill::Open(Color::RGB(255, 255, 255), 1),
             children: elms,
         }
     };
