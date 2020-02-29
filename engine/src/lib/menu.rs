@@ -452,11 +452,37 @@ pub mod io {
             Fill::Closed(Color::RGB(0, 0, 0))
         }
 
+        fn text_zoom() -> usize {
+            2
+        }
+        fn glyph_padding() -> usize {
+            1
+        }
+
+        fn tree_flow() -> FlowAtts {
+            FlowAtts {
+                dir: Dir2D::Right,
+                padding: 4,
+            }
+        };
+        fn ctx_flow() -> FlowAtts {
+            FlowAtts {
+                dir: Dir2D::Left,
+                padding: 4,
+            }
+        };
+        fn sub_flow() -> FlowAtts {
+            FlowAtts {
+                dir: Dir2D::Down,
+                padding: 4,
+            }
+        };
+
         // eventually we get these atts from
         //  some environment-determined settings
         fn meta_atts() -> TextAtts {
             TextAtts {
-                zoom: 2,
+                zoom: text_zoom(),
                 fg_fill: Fill::Closed(Color::RGB(255, 200, 255)),
                 bg_fill: Fill::Closed(Color::RGB(30, 0, 0)),
                 glyph_dim: Dim {
@@ -465,13 +491,13 @@ pub mod io {
                 },
                 glyph_flow: FlowAtts {
                     dir: Dir2D::Right,
-                    padding: 3,
+                    padding: glyph_padding(),
                 },
             }
         };
-        fn text_atts() -> TextAtts {
+        fn kw_atts() -> TextAtts {
             TextAtts {
-                zoom: 2,
+                zoom: text_zoom(),
                 fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
                 bg_fill: Fill::Closed(Color::RGB(30, 0, 0)),
                 glyph_dim: Dim {
@@ -480,13 +506,28 @@ pub mod io {
                 },
                 glyph_flow: FlowAtts {
                     dir: Dir2D::Right,
-                    padding: 3,
+                    padding: glyph_padding(),
+                },
+            }
+        };
+        fn text_atts() -> TextAtts {
+            TextAtts {
+                zoom: text_zoom(),
+                fg_fill: Fill::Closed(Color::RGB(200, 200, 200)),
+                bg_fill: Fill::Closed(Color::RGB(30, 0, 0)),
+                glyph_dim: Dim {
+                    width: 5,
+                    height: 5,
+                },
+                glyph_flow: FlowAtts {
+                    dir: Dir2D::Right,
+                    padding: glyph_padding(),
                 },
             }
         };
         fn blank_atts() -> TextAtts {
             TextAtts {
-                zoom: 2,
+                zoom: text_zoom(),
                 fg_fill: Fill::Closed(Color::RGB(255, 200, 200)),
                 bg_fill: Fill::Closed(Color::RGB(100, 0, 0)),
                 glyph_dim: Dim {
@@ -495,26 +536,8 @@ pub mod io {
                 },
                 glyph_flow: FlowAtts {
                     dir: Dir2D::Right,
-                    padding: 3,
+                    padding: glyph_padding(),
                 },
-            }
-        };
-        fn ctx_flow() -> FlowAtts {
-            FlowAtts {
-                dir: Dir2D::Left,
-                padding: 2,
-            }
-        };
-        fn tree_flow() -> FlowAtts {
-            FlowAtts {
-                dir: Dir2D::Right,
-                padding: 2,
-            }
-        };
-        fn sub_flow() -> FlowAtts {
-            FlowAtts {
-                dir: Dir2D::Down,
-                padding: 1,
             }
         };
         // eventually we want smarter layout algorithms
@@ -529,14 +552,15 @@ pub mod io {
         };
 
         fn render_product_label(label: &Label, r: &mut Render) {
+            r.str("*", &kw_atts());
             r.name(label, &text_atts());
-            r.str("=", &text_atts());
+            r.str("=", &kw_atts());
         }
 
         fn render_variant_label(label: &Label, r: &mut Render) {
-            r.str("#", &text_atts());
+            r.str("#", &kw_atts());
             r.name(label, &text_atts());
-            r.str("=", &text_atts());
+            r.str("=", &kw_atts());
         }
 
         fn begin_item(r: &mut Render) {
@@ -553,7 +577,7 @@ pub mod io {
             r.fill(black_fill());
             match ctx {
                 &MenuCtx::Root => {
-                    r.str("/", &text_atts());
+                    r.str("/", &meta_atts());
                 }
                 &MenuCtx::Product(ref sel) => {
                     next_ctx = Some(sel.ctx.clone());
@@ -567,7 +591,7 @@ pub mod io {
                     {
                         begin_item(r);
                         render_product_label(&sel.label, r);
-                        r.str("...", &text_atts());
+                        r.str("...", &meta_atts());
                         r.end();
                     }
                     for (l, t, ty) in sel.after.iter() {
@@ -589,7 +613,7 @@ pub mod io {
                     {
                         begin_item(r);
                         render_variant_label(&sel.label, r);
-                        r.str("...", &text_atts());
+                        r.str("...", &meta_atts());
                         render_ctx(&*ctx, r);
                         r.end();
                         next_ctx = Some(sel.ctx.clone());
