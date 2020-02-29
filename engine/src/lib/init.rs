@@ -16,26 +16,30 @@ pub fn init_state() -> State {
                 Command::Bitmap(bitmap::Command::Init(bitmap::InitCommand::Make16x16)),
             )
         } else {
-            use crate::menu::{MenuChoice, MenuType, PrimType};
+            use crate::menu::{MenuType, PrimType};
 
             let variant_l_r = MenuType::Variant(vec![
                 (
-                    Name::Atom(Atom::String("ll".to_string())),
+                    Name::Atom(Atom::String("nat".to_string())),
                     MenuType::Prim(PrimType::Nat),
                 ),
                 (
-                    Name::Atom(Atom::String("rr".to_string())),
-                    MenuType::Prim(PrimType::Nat),
+                    Name::Atom(Atom::String("text".to_string())),
+                    MenuType::Prim(PrimType::Text),
+                ),
+                (
+                    Name::Atom(Atom::String("bool".to_string())),
+                    MenuType::Prim(PrimType::Bool),
                 ),
             ]);
 
             let product_a_b = MenuType::Product(vec![
                 (
-                    Name::Atom(Atom::String("aa".to_string())),
+                    Name::Atom(Atom::String("apple".to_string())),
                     variant_l_r.clone(),
                 ),
                 (
-                    Name::Atom(Atom::String("bb".to_string())),
+                    Name::Atom(Atom::String("banana".to_string())),
                     variant_l_r.clone(),
                 ),
             ]);
@@ -48,7 +52,7 @@ pub fn init_state() -> State {
                     })),
                 },
                 Command::Menu(menu::Command::Init(menu::InitCommand::Default(
-                    MenuChoice::Blank,
+                    menu::MenuTree::Blank(product_a_b.clone()),
                     product_a_b,
                 ))),
             )

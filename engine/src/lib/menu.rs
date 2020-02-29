@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use types::lang::Name;
+use types::lang::{Dir1D, Name};
 
 pub type Text = String;
 pub type Nat = usize; // todo -- use a bignum rep
 pub type Label = Name;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum MenuType {
     Prim(PrimType),
     Variant(Vec<(Label, MenuType)>),
@@ -16,24 +16,46 @@ pub enum MenuType {
     Tup(Vec<MenuType>),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum PrimType {
     Nat,
     Text,
+    Bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub enum MenuChoice {
-    Blank,
+pub enum MenuTree {
+    Product(Vec<(Label, MenuTree, MenuType)>),
+    Variant(Box<LabelChoice>),
+    Option(bool, Box<MenuTree>, MenuType),
+    Vec(Vec<MenuTree>, MenuType),
+    Tup(Vec<(MenuTree, MenuType)>),
+    Blank(MenuType),
     Nat(Nat),
     Text(Text),
-    Variant(Label, Box<MenuChoice>),
-    Product(Vec<(Label, MenuChoice)>),
-    Some(Box<MenuChoice>),
-    None,
-    Vec(Vec<MenuChoice>),
-    Tup(Vec<MenuChoice>),
-    Error(Error, Box<MenuChoice>),
+    Bool(bool),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+pub struct LabelSelect {
+    before: Vec<(Label, MenuTree, MenuType)>,
+    ctx: MenuCtx,
+    label: Label,
+    after: Vec<(Label, MenuTree, MenuType)>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+pub struct PosSelect {
+    before: Vec<(Label, MenuTree, MenuType)>,
+    ctx: MenuCtx,
+    after: Vec<(Label, MenuTree, MenuType)>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+pub struct LabelChoice {
+    before: Vec<(Label, MenuTree, MenuType)>,
+    choice: Option<(Label, MenuTree, MenuType)>,
+    after: Vec<(Label, MenuTree, MenuType)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -54,30 +76,29 @@ pub enum Tag {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum InitCommand {
-    //DefaultChoice(MenuChoice, MenuType)
-    Default(MenuChoice, MenuType),
+    Default(MenuTree, MenuType),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum AutoCommand {
     CheckMenuType,
     CheckComplete,
-    Replace(MenuChoice),
+    Replace(MenuTree),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum EditCommand {
-    GotoRoot,           // Escape
-    AutoFill,           // Tab
-    NextBlank,          // ArrowDown
-    PrevBlank,          // ArrowUp
-    VecInsertBlank,     // Comma
-    VecInsertAuto,      // Shift-Comma
-    VariantNext,        // ArrowDown
-    VariantPrev,        // ArrowUp
-    VariantAccept,      // Enter
-    VariantReset,       // Space
-    Choose(MenuChoice), // (no simple keybinding)
+    GotoRoot,  // Escape
+    AutoFill,  // Tab
+    NextTree,  // ArrowRight
+    PrevTree,  // ArrowLeft
+    NextBlank, // ArrowDown
+    PrevBlank, // ArrowUp
+    VariantNext,
+    VecInsertBlank, // Comma
+    VecInsertAuto,  // Shift-Comma
+    VariantAccept,  // Enter
+    VariantReset,   // Space
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
@@ -90,37 +111,11 @@ pub enum Command {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum MenuCtx {
     Root,
-    Product(LabelChoice<Box<MenuCtx>>),
-    Variant(LabelChoice<Box<MenuCtx>>),
+    Product(Box<LabelSelect>),
+    Variant(Box<LabelSelect>),
     Option(bool, Box<MenuCtx>),
-    Vec(PosChoice<Box<MenuCtx>>),
-    Tup(PosChoice<Box<MenuCtx>>),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct PosChoice<X> {
-    before_choice: Vec<(MenuTree, MenuType)>,
-    choice: Option<X>,
-    after_choice: Vec<(MenuTree, MenuType)>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct LabelChoice<X> {
-    before_choice: Vec<(Label, MenuTree, MenuType)>,
-    choice: Option<(Label, X)>,
-    after_choice: Vec<(Label, MenuTree, MenuType)>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub enum MenuTree {
-    Product(Vec<(Label, MenuTree, MenuType)>),
-    Variant(LabelChoice<Box<(MenuTree, MenuType)>>),
-    Option(bool, Box<MenuTree>, MenuType),
-    Vec(Vec<MenuTree>, MenuType),
-    Tup(Vec<(MenuTree, MenuType)>),
-    Blank(MenuType),
-    Nat(Nat),
-    Text(Text),
+    Vec(Box<PosSelect>),
+    Tup(Box<PosSelect>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -129,8 +124,6 @@ pub struct MenuState {
     pub ctx: MenuCtx,      // invariant: see typ.
     pub tree: MenuTree,    // invariant: tree has type tree_typ.
     pub tree_typ: MenuType,
-    pub choice: MenuChoice, // invariant: choice has type typ; choice = unfocus(ctx, tree);
-                            // invariant: tree has type typ
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -154,7 +147,6 @@ pub mod semantics {
                     ctx: MenuCtx::Root,
                     tree: MenuTree::Blank(typ.clone()),
                     tree_typ: typ.clone(),
-                    choice: default_choice.clone(),
                 });
                 Ok(())
             }
@@ -174,11 +166,14 @@ pub mod semantics {
             &EditCommand::GotoRoot => goto_root(menu),
             &EditCommand::AutoFill => {
                 let tree = auto_fill(&menu.typ, 1);
-                menu.tree = tree_union(&menu.tree, &tree);
+                drop(tree_union(&menu.tree, &tree));
+                menu.tree = tree;
                 Ok(())
             }
             &EditCommand::NextBlank => next_blank(menu).map(|_| ()),
-            &EditCommand::PrevBlank => unimplemented!(),
+            &EditCommand::PrevBlank => prev_blank(menu).map(|_| ()),
+            &EditCommand::NextTree => next_tree(menu).map(|_| ()),
+            &EditCommand::PrevTree => prev_tree(menu).map(|_| ()),
             &EditCommand::VecInsertBlank => {
                 assert_tree_tag(&menu.tree, &Tag::Vec)?;
                 unimplemented!()
@@ -204,19 +199,15 @@ pub mod semantics {
         unimplemented!()
     }
 
-    pub fn tree_has_complete_choice(tree: &MenuTree) -> bool {
+    pub fn tree_is_complete(tree: &MenuTree) -> bool {
         match tree {
             MenuTree::Product(trees) => unimplemented!(),
             MenuTree::Variant(choice) => match &choice.choice {
                 None => false,
-                Some((l, t_tt)) => tree_has_complete_choice(&t_tt.0),
+                Some((l, t, t_tt)) => tree_is_complete(t),
             },
             _ => unimplemented!(),
         }
-    }
-
-    pub fn ascend(menu: &mut MenuState) -> Res {
-        unimplemented!()
     }
 
     pub fn goto_root(menu: &mut MenuState) -> Res {
@@ -239,10 +230,19 @@ pub mod semantics {
         }
     }
 
+    pub fn prev_blank(menu: &mut MenuState) -> Result<MenuType, Err> {
+        match menu.tree {
+            MenuTree::Blank(ref t) => Ok(t.clone()),
+            _ => {
+                prev_tree(menu)?;
+                prev_blank(menu)
+            }
+        }
+    }
+
     pub fn next_tree(menu: &mut MenuState) -> Res {
-        match next_subtree(menu) {
+        match descend(menu, Dir1D::Forward) {
             Ok(()) => Ok(()),
-            // Err case: Need to look for next tree in the context:
             Err(_) => match next_sibling(menu) {
                 Ok(()) => Ok(()),
                 Err(_) => {
@@ -253,22 +253,57 @@ pub mod semantics {
         }
     }
 
-    pub fn next_subtree(menu: &mut MenuState) -> Res {
+    pub fn prev_tree(menu: &mut MenuState) -> Res {
+        match descend(menu, Dir1D::Backward) {
+            Ok(()) => Ok(()),
+            Err(_) => match prev_sibling(menu) {
+                Ok(()) => Ok(()),
+                Err(_) => {
+                    ascend(menu)?;
+                    prev_tree(menu)
+                }
+            },
+        }
+    }
+
+    pub fn ascend(menu: &mut MenuState) -> Res {
+        unimplemented!()
+    }
+
+    pub fn descend(menu: &mut MenuState, dir: Dir1D) -> Res {
         // navigate product field structure; ignore unchosen variant options.
         match menu.tree {
+            MenuTree::Blank(_) => Err("no subtrees".to_string()),
             MenuTree::Product(ref trees) => {
                 let mut trees = trees.clone();
                 if trees.len() > 0 {
-                    trees.rotate_left(1);
-                    let (label, tree, tree_t) = trees.pop().unwrap();
-                    menu.tree = tree;
-                    menu.tree_typ = tree_t;
-                    menu.ctx = MenuCtx::Product(LabelChoice {
-                        before_choice: vec![],
-                        choice: Some((label, Box::new(menu.ctx.clone()))),
-                        after_choice: trees,
-                    });
-                    Ok(())
+                    match dir {
+                        Dir1D::Forward => {
+                            trees.rotate_left(1);
+                            let (label, tree, tree_t) = trees.pop().unwrap();
+                            menu.tree = tree;
+                            menu.tree_typ = tree_t;
+                            menu.ctx = MenuCtx::Product(Box::new(LabelSelect {
+                                before: vec![],
+                                ctx: menu.ctx.clone(),
+                                label: label,
+                                after: trees,
+                            }));
+                            Ok(())
+                        }
+                        Dir1D::Backward => {
+                            let (label, tree, tree_t) = trees.pop().unwrap();
+                            menu.tree = tree;
+                            menu.tree_typ = tree_t;
+                            menu.ctx = MenuCtx::Product(Box::new(LabelSelect {
+                                before: trees,
+                                ctx: menu.ctx.clone(),
+                                label: label,
+                                after: vec![],
+                            }));
+                            Ok(())
+                        }
+                    }
                 } else {
                     Err("no subtrees".to_string())
                 }
@@ -282,18 +317,13 @@ pub mod semantics {
     // or Err if no such list in immediate context.
     pub fn next_sibling(menu: &mut MenuState) -> Res {
         match menu.ctx {
-            MenuCtx::Product(ref ctx) => {
-                if ctx.after_choice.len() > 0 {
-                    let mut ctx = ctx.clone();
-                    ctx.after_choice.rotate_left(1);
-                    let (label, tree, tree_typ) = ctx.after_choice.pop().unwrap();
-                    unimplemented!()
-                } else {
-                    Err("no siblings".to_string())
-                }
-            }
+            MenuCtx::Product(ref ctx) => unimplemented!(),
             _ => unimplemented!(),
         }
+    }
+
+    pub fn prev_sibling(menu: &mut MenuState) -> Res {
+        unimplemented!()
     }
 
     pub fn next_subtree_choice(menu: &mut MenuState) -> Res {
@@ -325,10 +355,18 @@ pub mod semantics {
         match (tree1, tree2) {
             (&MenuTree::Blank(_), _) => tree2.clone(),
             (_, &MenuTree::Blank(_)) => tree2.clone(),
-            (_, _) => {
-                info!("tree_union({:?}, {:?}) begin", tree1, tree2);
-                unimplemented!()
+            (&MenuTree::Variant(ref arms1), &MenuTree::Variant(ref arms2)) => unimplemented!(),
+            (&MenuTree::Product(ref fields1), &MenuTree::Product(ref fields2)) => {
+                let mut fields3 = vec![];
+                for ((l1, t1, tt1), (l2, t2, tt2)) in fields1.iter().zip(fields2.iter()) {
+                    assert_eq!(l1, l2);
+                    assert_eq!(tt1, tt2);
+                    let t3 = tree_union(t1, t2);
+                    fields3.push((l1.clone(), t3, tt1.clone()));
+                }
+                MenuTree::Product(fields3)
             }
+            (_, _) => unimplemented!(),
         }
     }
 
@@ -339,16 +377,17 @@ pub mod semantics {
             match typ {
                 &MenuType::Prim(PrimType::Nat) => MenuTree::Nat(0),
                 &MenuType::Prim(PrimType::Text) => MenuTree::Text("".to_string()),
+                &MenuType::Prim(PrimType::Bool) => MenuTree::Bool(false),
                 &MenuType::Variant(ref labtyps) => {
                     let after_choices: Vec<(Label, MenuTree, MenuType)> = labtyps
                         .iter()
                         .map(|(l, lt)| (l.clone(), auto_fill(lt, depth - 1), lt.clone()))
                         .collect();
-                    MenuTree::Variant(LabelChoice {
-                        before_choice: vec![],
+                    MenuTree::Variant(Box::new(LabelChoice {
+                        before: vec![],
                         choice: None,
-                        after_choice: after_choices,
-                    })
+                        after: after_choices,
+                    }))
                 }
                 &MenuType::Product(ref labtyps) => {
                     let menus: Vec<(Label, MenuTree, MenuType)> = labtyps
@@ -378,22 +417,6 @@ pub mod semantics {
             }
         }
     }
-
-    pub fn get_choice(menu: &MenuState) -> Result<MenuChoice, Error> {
-        #[allow(unused_variables, unused_mut)]
-        pub fn choice_of_ctx(ctx: &MenuCtx, local_choice: MenuChoice) -> Result<MenuChoice, Error> {
-            unimplemented!()
-        };
-
-        #[allow(unused_variables, unused_mut)]
-        pub fn choice_of_tree(tree: &MenuTree) -> Result<MenuChoice, Error> {
-            unimplemented!()
-        };
-
-        let choice = choice_of_tree(&menu.tree)?;
-        let choice = choice_of_ctx(&menu.ctx, choice)?;
-        Ok(choice)
-    }
 }
 
 pub mod io {
@@ -401,7 +424,7 @@ pub mod io {
     use render::Render;
     use types::event::Event;
     use types::{
-        lang::{Dir2D, Name},
+        lang::{Dir1D, Dir2D, Name},
         render::{Color, Dim, Elms, Fill},
     };
 
@@ -412,8 +435,8 @@ pub mod io {
                 "Escape" => Err(()),
                 " " => Ok(vec![]),
                 "Tab" => Ok(vec![EditCommand::AutoFill]),
-                "ArrowLeft" => Ok(vec![EditCommand::PrevBlank]),
-                "ArrowRight" => Ok(vec![EditCommand::NextBlank]),
+                "ArrowLeft" => Ok(vec![EditCommand::PrevTree]),
+                "ArrowRight" => Ok(vec![EditCommand::NextTree]),
                 "ArrowUp" => Ok(vec![EditCommand::PrevBlank]),
                 "ArrowDown" => Ok(vec![EditCommand::NextBlank]),
                 _ => Ok(vec![]),
@@ -506,29 +529,29 @@ pub mod io {
         }
 
         fn render_ctx(ctx: &MenuCtx, r: &mut Render) {
-            info!("render_ctx({:?})", ctx);
+            trace!("render_ctx({:?})", ctx);
             let mut next_ctx = None;
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             match ctx {
                 &MenuCtx::Root => {
                     r.str("/", &text_atts());
                 }
-                &MenuCtx::Product(ref ch) => {
+                &MenuCtx::Product(ref sel) => {
+                    next_ctx = Some(sel.ctx.clone());
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
-                    for (l, t, ty) in ch.before_choice.iter() {
+                    for (l, t, ty) in sel.before.iter() {
                         begin_item(r);
                         render_product_label(l, r);
                         render_tree(t, r);
                         r.end();
                     }
-                    if let Some((ref l, ref ctx)) = ch.choice {
+                    {
                         begin_item(r);
-                        render_product_label(l, r);
+                        render_product_label(&sel.label, r);
                         r.str(" ...", &text_atts());
                         r.end();
-                        next_ctx = Some((*ctx).clone());
-                    };
-                    for (l, t, ty) in ch.after_choice.iter() {
+                    }
+                    for (l, t, ty) in sel.after.iter() {
                         begin_item(r);
                         render_product_label(&l, r);
                         render_tree(t, r);
@@ -536,23 +559,23 @@ pub mod io {
                     }
                     r.end();
                 }
-                &MenuCtx::Variant(ref ch) => {
+                &MenuCtx::Variant(ref sel) => {
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
-                    for (l, t, ty) in ch.before_choice.iter() {
+                    for (l, t, ty) in sel.before.iter() {
                         begin_item(r);
                         render_variant_label(&l, r);
                         render_tree(t, r);
                         r.end()
                     }
-                    if let Some((ref l, ref ctx)) = ch.choice {
+                    {
                         begin_item(r);
-                        render_variant_label(l, r);
+                        render_variant_label(&sel.label, r);
                         r.str(" ...", &text_atts());
                         render_ctx(&*ctx, r);
                         r.end();
-                        next_ctx = Some((*ctx).clone());
-                    };
-                    for (l, t, ty) in ch.after_choice.iter() {
+                        next_ctx = Some(sel.ctx.clone());
+                    }
+                    for (l, t, ty) in sel.after.iter() {
                         begin_item(r);
                         render_variant_label(&l, r);
                         render_tree(t, r);
@@ -567,7 +590,7 @@ pub mod io {
             r.end();
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
             if let Some(ctx) = next_ctx {
-                info!("context continues...");
+                info!("--- context continues... ---");
                 render_ctx(&ctx, r)
             } else {
                 info!("context end: root.");
@@ -590,19 +613,19 @@ pub mod io {
                 }
                 &MenuTree::Variant(ref ch) => {
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
-                    for (l, t, ty) in ch.before_choice.iter() {
+                    for (l, t, ty) in ch.before.iter() {
                         begin_item(r);
                         render_variant_label(l, r);
                         render_tree(t, r);
                         r.end()
                     }
-                    if let Some((ref l, ref tree)) = ch.choice {
+                    if let Some((ref l, ref tree, ref _tree_t)) = ch.choice {
                         begin_item(r);
                         render_variant_label(l, r);
-                        render_tree(&tree.0, r);
+                        render_tree(&tree, r);
                         r.end();
                     };
-                    for (l, t, ty) in ch.after_choice.iter() {
+                    for (l, t, ty) in ch.after.iter() {
                         begin_item(r);
                         render_variant_label(l, r);
                         render_tree(t, r);
@@ -630,8 +653,9 @@ pub mod io {
                     }
                     r.end();
                 }
-                &MenuTree::Blank(ref typ) => r.str("__<blank>__", &blank_atts()),
+                &MenuTree::Blank(ref typ) => r.text(&format!("__{:?}__", typ), &blank_atts()),
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
+                &MenuTree::Bool(b) => r.text(&format!("{}", b), &text_atts()),
                 &MenuTree::Text(ref t) => r.text(t, &text_atts()),
             };
             //info!("render_tree({:?}): end.", tree);
@@ -639,16 +663,13 @@ pub mod io {
         };
         info!("render_menu_begin");
         let mut r = Render::new();
-        r.begin(&Name::Void, FrameType::Flow(menu_flow()));
-
+        r.begin(&Name::Void, FrameType::Flow(tree_flow()));
         r.begin(&Name::Void, FrameType::Flow(ctx_flow()));
-        render_ctx(&menu.ctx, &mut r);
+        //render_ctx(&menu.ctx, &mut r);
         r.end();
-
         r.begin(&Name::Void, FrameType::Flow(tree_flow()));
         render_tree(&menu.tree, &mut r);
         r.end();
-
         r.end();
         info!("render_menu_end");
         Ok(r.into_elms())
