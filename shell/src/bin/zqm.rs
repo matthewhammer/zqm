@@ -139,11 +139,7 @@ pub fn draw_elms<T: RenderTarget>(
                 );
                 draw_elms(canvas, &pos, &node.children)?;
             }
-            &Elm::Rect(r, f) => {
-                if true {
-                    draw_rect(canvas, pos, r, f)
-                }
-            }
+            &Elm::Rect(r, f) => draw_rect(canvas, pos, r, f),
         }
     }
     Ok(())

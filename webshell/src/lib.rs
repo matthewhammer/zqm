@@ -10,14 +10,14 @@ use std::rc::Rc;
 
 extern crate zqm_engine;
 use zqm_engine::{
-    eval, init,
+    eval, init, render,
     types::{
-        event::{Event, KeyEventInfo},
-        render,
+        event::{self, Event, KeyEventInfo},
+        render::{Color, Elm, Elms, Fill, Pos, Rect},
     },
 };
 
-pub fn draw_elms(pos: &render::Pos, elms: &render::Elms) {
+pub fn draw_elms(pos: &Pos, elms: &Elms) {
     // to do -- left this step outside of the recursion, for efficiency
     let document = web_sys::window().unwrap().document().unwrap();
     let canvas = document.get_element_by_id("canvas").unwrap();
@@ -32,9 +32,9 @@ pub fn draw_elms(pos: &render::Pos, elms: &render::Elms) {
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
 
-    fn translate_color(c: &render::Color) -> JsValue {
+    fn translate_color(c: &Color) -> JsValue {
         match c {
-            &render::Color::RGB(r, g, b) => {
+            &Color::RGB(r, g, b) => {
                 let v: JsValue = format!("rgb({},{},{})", r as u8, g as u8, b as u8)
                     .as_str()
                     .into();
@@ -43,20 +43,12 @@ pub fn draw_elms(pos: &render::Pos, elms: &render::Elms) {
         }
     };
 
-    use zqm_engine::types::render::{Elm, Fill};
-    for elm in elms.iter() {
-        match &elm {
-            &Elm::Node(node) => {
-                let pos = render::Pos {
-                    x: pos.x + node.rect.pos.x,
-                    y: pos.y + node.rect.pos.y,
-                };
-                draw_elms(&pos, &node.children)
+    fn draw_rect(context: &web_sys::CanvasRenderingContext2d, pos: &Pos, r: &Rect, f: &Fill) {
+        match f {
+            Fill::None => {
+                // no-op.
             }
-            &Elm::Rect(_r, Fill::None) => {
-                // do nothing
-            }
-            &Elm::Rect(r, Fill::Closed(c)) => {
+            Fill::Closed(c) => {
                 let c: JsValue = translate_color(c);
                 context.set_fill_style(&c);
                 context.fill_rect(
@@ -66,8 +58,7 @@ pub fn draw_elms(pos: &render::Pos, elms: &render::Elms) {
                     r.dim.height as f64,
                 );
             }
-            &Elm::Rect(r, Fill::Open(c, width)) => {
-                assert_eq!(*width, 1);
+            Fill::Open(c, 1) => {
                 let c: JsValue = translate_color(c);
                 context.set_stroke_style(&c);
                 context.stroke_rect(
@@ -77,6 +68,26 @@ pub fn draw_elms(pos: &render::Pos, elms: &render::Elms) {
                     r.dim.height as f64,
                 );
             }
+            Fill::Open(_, _) => unimplemented!(),
+        }
+    };
+
+    for elm in elms.iter() {
+        match &elm {
+            &Elm::Node(node) => {
+                let pos = Pos {
+                    x: pos.x + node.rect.pos.x,
+                    y: pos.y + node.rect.pos.y,
+                };
+                draw_rect(
+                    &context,
+                    &pos,
+                    &Rect::new(0, 0, node.rect.dim.width, node.rect.dim.height),
+                    &node.fill,
+                );
+                draw_elms(&pos, &node.children)
+            }
+            &Elm::Rect(r, f) => draw_rect(&context, pos, &r, &f),
         }
     }
 }
@@ -90,10 +101,7 @@ pub fn console_log(m: String) {
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue> {
     let mut state = init::init_state();
-    draw_elms(
-        &render::Pos { x: 0, y: 0 },
-        &eval::render_elms(&mut state).unwrap(),
-    );
+    draw_elms(&Pos { x: 0, y: 0 }, &eval::render_elms(&mut state).unwrap());
     let state_cell = Rc::new(Cell::new(state));
     let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
         let mut state: eval::State = state_cell.replace(init::init_state());
@@ -143,7 +151,7 @@ pub fn main() -> Result<(), JsValue> {
         // save updated state
         state_cell.set(state);
         // draw the engine elements onto the document's canvas element
-        draw_elms(&render::Pos { x: 0, y: 0 }, &render_elms);
+        draw_elms(&Pos { x: 0, y: 0 }, &render_elms);
     }) as Box<dyn FnMut(_)>);
 
     let document = web_sys::window().unwrap().document().unwrap();
