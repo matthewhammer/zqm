@@ -448,11 +448,30 @@ pub mod io {
     pub fn render_elms(menu: &MenuState) -> Result<Elms, String> {
         use crate::render::{FlowAtts, FrameType, TextAtts};
 
+        fn black_fill() -> Fill {
+            Fill::Closed(Color::RGB(0, 0, 0))
+        }
+
         // eventually we get these atts from
         //  some environment-determined settings
+        fn meta_atts() -> TextAtts {
+            TextAtts {
+                zoom: 2,
+                fg_fill: Fill::Closed(Color::RGB(255, 200, 255)),
+                bg_fill: Fill::Closed(Color::RGB(30, 0, 0)),
+                glyph_dim: Dim {
+                    width: 5,
+                    height: 5,
+                },
+                glyph_flow: FlowAtts {
+                    dir: Dir2D::Right,
+                    padding: 3,
+                },
+            }
+        };
         fn text_atts() -> TextAtts {
             TextAtts {
-                zoom: 3,
+                zoom: 1,
                 fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
                 bg_fill: Fill::Closed(Color::RGB(30, 0, 0)),
                 glyph_dim: Dim {
@@ -467,7 +486,7 @@ pub mod io {
         };
         fn blank_atts() -> TextAtts {
             TextAtts {
-                zoom: 3,
+                zoom: 1,
                 fg_fill: Fill::Closed(Color::RGB(255, 200, 200)),
                 bg_fill: Fill::Closed(Color::RGB(100, 0, 0)),
                 glyph_dim: Dim {
@@ -529,9 +548,9 @@ pub mod io {
         }
 
         fn render_ctx(ctx: &MenuCtx, r: &mut Render) {
-            trace!("render_ctx({:?})", ctx);
             let mut next_ctx = None;
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            r.fill(black_fill());
             match ctx {
                 &MenuCtx::Root => {
                     r.str("/", &text_atts());
@@ -653,7 +672,8 @@ pub mod io {
                     }
                     r.end();
                 }
-                &MenuTree::Blank(ref typ) => r.text(&format!("__{:?}__", typ), &blank_atts()),
+                //&MenuTree::Blank(ref typ) => r.text(&format!("__{:?}__", typ), &blank_atts()),
+                &MenuTree::Blank(ref typ) => r.text(&format!("___"), &blank_atts()),
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
                 &MenuTree::Bool(b) => r.text(&format!("{}", b), &text_atts()),
                 &MenuTree::Text(ref t) => r.text(t, &text_atts()),
@@ -663,13 +683,29 @@ pub mod io {
         };
         info!("render_menu_begin");
         let mut r = Render::new();
-        r.begin(&Name::Void, FrameType::Flow(tree_flow()));
-        r.begin(&Name::Void, FrameType::Flow(ctx_flow()));
-        //render_ctx(&menu.ctx, &mut r);
-        r.end();
-        r.begin(&Name::Void, FrameType::Flow(tree_flow()));
-        render_tree(&menu.tree, &mut r);
-        r.end();
+        r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+        r.fill(black_fill());
+        r.str("menu{", &meta_atts());
+        {
+            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            r.str("ctx=", &meta_atts());
+            r.begin(&Name::Void, FrameType::Flow(ctx_flow()));
+            {
+                render_ctx(&menu.ctx, &mut r);
+            }
+            r.end();
+            r.end();
+
+            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            r.str("tree=", &meta_atts());
+            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            {
+                render_tree(&menu.tree, &mut r);
+            }
+            r.end();
+            r.end();
+        }
+        r.str("}", &meta_atts());
         r.end();
         info!("render_menu_end");
         Ok(r.into_elms())

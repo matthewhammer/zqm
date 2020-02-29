@@ -38,6 +38,7 @@ pub enum FrameType {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Frame {
     pub name: Name,
+    pub fill: Fill,
     pub typ: FrameType,
     pub elms: Elms,
 }
@@ -53,6 +54,7 @@ impl Render {
         Render {
             frame: Frame {
                 name: Name::Void,
+                fill: Fill::None,
                 elms: vec![],
                 typ: FrameType::None,
             },
@@ -63,12 +65,17 @@ impl Render {
     pub fn begin(&mut self, name: &Name, typ: FrameType) {
         let new_frame = Frame {
             name: name.clone(),
+            fill: Fill::None,
             typ: typ,
             elms: vec![],
         };
         let top_frame = self.frame.clone();
         self.stack.push(top_frame);
         self.frame = new_frame;
+    }
+
+    pub fn fill(&mut self, f: Fill) {
+        self.frame.fill = f;
     }
 
     pub fn end(&mut self) {
@@ -247,28 +254,27 @@ fn reposition_elms(elms: &Elms, flow: FlowAtts) -> (Elms, Rect) {
     (elms_out, rect_out)
 }
 
-fn elm_of_elms(name: Name, elms: Elms, rect: Rect) -> Elm {
-    fn node_of_elms(name: Name, elms: Elms, rect: Rect) -> Node {
+fn elm_of_elms(name: Name, elms: Elms, rect: Rect, fill: Fill) -> Elm {
+    fn node_of_elms(name: Name, elms: Elms, rect: Rect, fill: Fill) -> Node {
         Node {
             name: name,
             rect: rect,
-            //fill: Fill::None,
-            fill: Fill::Open(Color::RGB(255, 255, 255), 1),
+            fill: fill,
             children: elms,
         }
     };
-    Elm::Node(Box::new(node_of_elms(name, elms, rect)))
+    Elm::Node(Box::new(node_of_elms(name, elms, rect, fill)))
 }
 
 fn elm_of_frame(frame: Frame) -> Elm {
     match frame.typ {
         FrameType::None => {
             let rect = bounding_rect_of_elms(&frame.elms);
-            elm_of_elms(frame.name, frame.elms, rect)
+            elm_of_elms(frame.name, frame.elms, rect, frame.fill)
         }
         FrameType::Flow(flow) => {
             let (elms, rect) = reposition_elms(&frame.elms, flow);
-            elm_of_elms(frame.name, elms, rect)
+            elm_of_elms(frame.name, elms, rect, frame.fill)
         }
     }
 }
