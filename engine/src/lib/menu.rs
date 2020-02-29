@@ -471,7 +471,7 @@ pub mod io {
         };
         fn text_atts() -> TextAtts {
             TextAtts {
-                zoom: 1,
+                zoom: 2,
                 fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
                 bg_fill: Fill::Closed(Color::RGB(30, 0, 0)),
                 glyph_dim: Dim {
@@ -486,7 +486,7 @@ pub mod io {
         };
         fn blank_atts() -> TextAtts {
             TextAtts {
-                zoom: 1,
+                zoom: 2,
                 fg_fill: Fill::Closed(Color::RGB(255, 200, 200)),
                 bg_fill: Fill::Closed(Color::RGB(100, 0, 0)),
                 glyph_dim: Dim {
@@ -689,7 +689,7 @@ pub mod io {
         {
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             r.str("ctx=", &meta_atts());
-            r.begin(&Name::Void, FrameType::Flow(ctx_flow()));
+            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             {
                 render_ctx(&menu.ctx, &mut r);
             }
