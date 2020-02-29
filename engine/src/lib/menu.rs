@@ -120,9 +120,9 @@ pub enum MenuCtx {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct MenuState {
-    pub typ: Rc<MenuType>, // invariant: typ = unfocus(ctx, tree_typ);
-    pub ctx: MenuCtx,      // invariant: see typ.
-    pub tree: MenuTree,    // invariant: tree has type tree_typ.
+    pub root_typ: Rc<MenuType>, // invariant: root_typ = unfocus(ctx, tree_typ);
+    pub ctx: MenuCtx,           // invariant: see typ.
+    pub tree: MenuTree,         // invariant: tree has type tree_typ.
     pub tree_typ: MenuType,
 }
 
@@ -143,7 +143,7 @@ pub mod semantics {
         let res = match command {
             Command::Init(InitCommand::Default(ref default_choice, ref typ)) => {
                 menu.state = Some(MenuState {
-                    typ: Rc::new(typ.clone()),
+                    root_typ: Rc::new(typ.clone()),
                     ctx: MenuCtx::Root,
                     tree: MenuTree::Blank(typ.clone()),
                     tree_typ: typ.clone(),
@@ -165,7 +165,7 @@ pub mod semantics {
         match command {
             &EditCommand::GotoRoot => goto_root(menu),
             &EditCommand::AutoFill => {
-                let tree = auto_fill(&menu.typ, 1);
+                let tree = auto_fill(&menu.tree_typ, 1);
                 drop(tree_union(&menu.tree, &tree));
                 menu.tree = tree;
                 Ok(())
@@ -567,7 +567,7 @@ pub mod io {
                     {
                         begin_item(r);
                         render_product_label(&sel.label, r);
-                        r.str(" ...", &text_atts());
+                        r.str("...", &text_atts());
                         r.end();
                     }
                     for (l, t, ty) in sel.after.iter() {
@@ -589,7 +589,7 @@ pub mod io {
                     {
                         begin_item(r);
                         render_variant_label(&sel.label, r);
-                        r.str(" ...", &text_atts());
+                        r.str("...", &text_atts());
                         render_ctx(&*ctx, r);
                         r.end();
                         next_ctx = Some(sel.ctx.clone());
@@ -703,6 +703,11 @@ pub mod io {
                 render_tree(&menu.tree, &mut r);
             }
             r.end();
+            r.end();
+
+            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            r.str("type=", &meta_atts());
+            r.text(&format!("{:?}", menu.tree_typ), &text_atts());
             r.end();
         }
         r.str("}", &meta_atts());
