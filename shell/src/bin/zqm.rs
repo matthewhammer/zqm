@@ -159,6 +159,7 @@ fn translate_system_event(event: SysEvent) -> Option<event::Event> {
             let key = match &kc {
                 Keycode::Tab => "Tab".to_string(),
                 Keycode::Space => " ".to_string(),
+                Keycode::Return => "Enter".to_string(),
                 Keycode::Left => "ArrowLeft".to_string(),
                 Keycode::Right => "ArrowRight".to_string(),
                 Keycode::Up => "ArrowUp".to_string(),

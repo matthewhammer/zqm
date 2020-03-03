@@ -88,17 +88,17 @@ pub enum AutoCommand {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum EditCommand {
-    GotoRoot,  // Escape
-    AutoFill,  // Tab
-    NextTree,  // ArrowRight
-    PrevTree,  // ArrowLeft
-    NextBlank, // ArrowDown
-    PrevBlank, // ArrowUp
-    VariantNext,
+    GotoRoot,       // Escape
+    AutoFill,       // Tab
+    NextTree,       // ArrowRight
+    PrevTree,       // ArrowLeft
+    NextBlank,      // ?
+    PrevBlank,      // ?
+    NextVariant,    // ArrowRight
+    PrevVariant,    // ArrowLefet
+    AcceptVariant,  // Enter
     VecInsertBlank, // Comma
     VecInsertAuto,  // Shift-Comma
-    VariantAccept,  // Enter
-    VariantReset,   // Space
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
@@ -183,11 +183,9 @@ pub mod semantics {
                 state_eval_command(menu, &EditCommand::VecInsertBlank)?;
                 state_eval_command(menu, &EditCommand::AutoFill)
             }
-            &EditCommand::VariantNext => {
-                assert_tree_tag(&menu.tree, &Tag::Variant)?;
-                next_subtree_choice(menu)
-            }
-            &EditCommand::VariantAccept => {
+            &EditCommand::NextVariant => cycle_variant(menu, Dir1D::Forward),
+            &EditCommand::PrevVariant => cycle_variant(menu, Dir1D::Backward),
+            &EditCommand::AcceptVariant => {
                 assert_tree_tag(&menu.tree, &Tag::Variant)?;
                 ascend(menu)
             }
@@ -196,7 +194,8 @@ pub mod semantics {
     }
 
     pub fn assert_tree_tag(tree: &MenuTree, tag: &Tag) -> Res {
-        unimplemented!()
+        // to do
+        Ok(())
     }
 
     pub fn tree_is_complete(tree: &MenuTree) -> bool {
@@ -267,7 +266,44 @@ pub mod semantics {
     }
 
     pub fn ascend(menu: &mut MenuState) -> Res {
-        unimplemented!()
+        match menu.ctx.clone() {
+            MenuCtx::Root => Err("cannot ascend: already at root".to_string()),
+            MenuCtx::Product(mut sel) => {
+                let mut arms = sel.before;
+                arms.push((sel.label, menu.tree.clone(), menu.tree_typ.clone()));
+                arms.append(&mut sel.after);
+                let fields: Vec<(Label, MenuType)> = arms
+                    .iter()
+                    .map(|(l, _, t)| (l.clone(), t.clone()))
+                    .collect();
+                menu.tree = MenuTree::Product(arms);
+                menu.tree_typ = MenuType::Product(fields);
+                menu.ctx = sel.ctx;
+                Ok(())
+            }
+            MenuCtx::Variant(sel) => {
+                let fields: Vec<(Label, MenuType)> = {
+                    let mut sel = sel.clone();
+                    let mut arms = sel.before;
+                    arms.push((sel.label, menu.tree.clone(), menu.tree_typ.clone()));
+                    arms.append(&mut sel.after);
+                    arms.iter()
+                        .map(|(l, _, t)| (l.clone(), t.clone()))
+                        .collect()
+                };
+                menu.tree = MenuTree::Variant(Box::new(LabelChoice {
+                    before: sel.before,
+                    choice: Some((sel.label, menu.tree.clone(), menu.tree_typ.clone())),
+                    after: sel.after,
+                }));
+                menu.tree_typ = MenuType::Variant(fields);
+                menu.ctx = sel.ctx;
+                Ok(())
+            }
+            MenuCtx::Option(flag, menu) => unimplemented!(),
+            MenuCtx::Vec(sel) => unimplemented!(),
+            MenuCtx::Tup(sel) => unimplemented!(),
+        }
     }
 
     pub fn descend(menu: &mut MenuState, dir: Dir1D) -> Res {
@@ -308,46 +344,74 @@ pub mod semantics {
                     Err("no subtrees".to_string())
                 }
             }
+            MenuTree::Variant(ref trees) => {
+                let trees = trees.clone();
+                match trees.choice {
+                    Some((label, tree, tree_t)) => match dir {
+                        Dir1D::Forward => {
+                            menu.tree = tree;
+                            menu.tree_typ = tree_t;
+                            menu.ctx = MenuCtx::Variant(Box::new(LabelSelect {
+                                before: trees.before.clone(),
+                                ctx: menu.ctx.clone(),
+                                label: label,
+                                after: trees.after.clone(),
+                            }));
+                            info!("{:?} {:?} {:?}", menu.tree, menu.tree_typ, menu.ctx);
+                            Ok(())
+                        }
+                        Dir1D::Backward => unimplemented!(),
+                    },
+                    None => Err("no choice subtree".to_string()),
+                }
+            }
             _ => unimplemented!(),
         }
     }
 
-    // consult the context, and refocus the ctx/tree/typ fields
-    // on the next product/vec/tuple arm,
-    // or Err if no such list in immediate context.
-    pub fn next_sibling(menu: &mut MenuState) -> Res {
-        match menu.ctx {
-            MenuCtx::Product(ref ctx) => unimplemented!(),
-            _ => unimplemented!(),
+    pub fn cycle_variant(menu: &mut MenuState, dir: Dir1D) -> Res {
+        match menu.tree {
+            MenuTree::Variant(ref arms) => {
+                let mut arms = arms.clone();
+                match dir {
+                    Dir1D::Forward => {
+                        if arms.after.len() > 0 {
+                            arms.after.rotate_left(1);
+                            let (label, tree, tree_t) = arms.after.pop().unwrap();
+                            if let Some(ch) = arms.choice {
+                                arms.before.push(ch);
+                            }
+                            arms.choice = Some((label, tree, tree_t));
+                            menu.tree = MenuTree::Variant(arms);
+                            Ok(())
+                        } else {
+                            arms.after = arms.before;
+                            arms.before = vec![];
+                            if let Some(ch) = arms.choice {
+                                arms.after.push(ch);
+                                arms.choice = None;
+                            }
+                            menu.tree = MenuTree::Variant(arms);
+                            Ok(())
+                        }
+                    }
+                    Dir1D::Backward => unimplemented!(),
+                }
+            }
+            _ => unreachable!(),
         }
+    }
+
+    pub fn prev_variant(menu: &mut MenuState) -> Res {
+        unimplemented!()
+    }
+
+    pub fn next_sibling(menu: &mut MenuState) -> Res {
+        unimplemented!()
     }
 
     pub fn prev_sibling(menu: &mut MenuState) -> Res {
         unimplemented!()
-    }
-
-    pub fn next_subtree_choice(menu: &mut MenuState) -> Res {
-        // select successive variant choices; ignore product structure.
-        unimplemented!()
-    }
-
-    pub fn next_sibling_choice(menu: &mut MenuState) -> Res {
-        // select successive variant choices from context; ignore product structure.
-        unimplemented!()
-    }
-
-    pub fn next_tree_choice(menu: &mut MenuState) -> Res {
-        match next_subtree_choice(menu) {
-            Ok(()) => Ok(()),
-            // Err case: Need to look for next tree in the context:
-            Err(_) => match next_sibling_choice(menu) {
-                Ok(()) => Ok(()),
-                Err(_) => {
-                    ascend(menu)?;
-                    next_tree_choice(menu)
-                }
-            },
-        }
     }
 
     pub fn tree_union(tree1: &MenuTree, tree2: &MenuTree) -> MenuTree {
@@ -433,12 +497,15 @@ pub mod io {
             &Event::Quit { .. } => Err(()),
             &Event::KeyDown(ref kei) => match kei.key.as_str() {
                 "Escape" => Err(()),
-                " " => Ok(vec![]),
                 "Tab" => Ok(vec![EditCommand::AutoFill]),
+
                 "ArrowLeft" => Ok(vec![EditCommand::PrevTree]),
                 "ArrowRight" => Ok(vec![EditCommand::NextTree]),
-                "ArrowUp" => Ok(vec![EditCommand::PrevBlank]),
-                "ArrowDown" => Ok(vec![EditCommand::NextBlank]),
+
+                "ArrowUp" => Ok(vec![EditCommand::PrevVariant]),
+                "ArrowDown" => Ok(vec![EditCommand::NextVariant]),
+                "Enter" => Ok(vec![EditCommand::AcceptVariant]),
+
                 _ => Ok(vec![]),
             },
             _ => Ok(vec![]),
@@ -551,14 +618,24 @@ pub mod io {
             tree_flow()
         };
 
+        fn render_choice_label(label: &Label, r: &mut Render) {
+            r.str("#", &kw_atts());
+            r.name(label, &text_atts());
+            r.str("=", &kw_atts());
+        }
+
         fn render_product_label(label: &Label, r: &mut Render) {
             r.str("*", &kw_atts());
             r.name(label, &text_atts());
             r.str("=", &kw_atts());
         }
 
-        fn render_variant_label(label: &Label, r: &mut Render) {
-            r.str("#", &kw_atts());
+        fn render_variant_label(is_chosen: bool, label: &Label, r: &mut Render) {
+            if is_chosen {
+                r.str("*#", &kw_atts());
+            } else {
+                r.str(" #", &kw_atts());
+            }
             r.name(label, &text_atts());
             r.str("=", &kw_atts());
         }
@@ -606,21 +683,21 @@ pub mod io {
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
                     for (l, t, ty) in sel.before.iter() {
                         begin_item(r);
-                        render_variant_label(&l, r);
+                        render_variant_label(false, &l, r);
                         render_tree(t, r);
                         r.end()
                     }
                     {
                         begin_item(r);
-                        render_variant_label(&sel.label, r);
+                        render_variant_label(true, &sel.label, r);
                         r.str("...", &meta_atts());
-                        render_ctx(&*ctx, r);
+                        render_ctx(&sel.ctx, r);
                         r.end();
                         next_ctx = Some(sel.ctx.clone());
                     }
                     for (l, t, ty) in sel.after.iter() {
                         begin_item(r);
-                        render_variant_label(&l, r);
+                        render_variant_label(false, &l, r);
                         render_tree(t, r);
                         r.end()
                     }
@@ -632,11 +709,13 @@ pub mod io {
             };
             r.end();
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
-            if let Some(ctx) = next_ctx {
-                info!("--- context continues... ---");
-                render_ctx(&ctx, r)
-            } else {
-                info!("context end: root.");
+            if false {
+                if let Some(ctx) = next_ctx {
+                    info!("--- context continues... ---");
+                    render_ctx(&ctx, r)
+                } else {
+                    info!("context end: root.");
+                }
             };
         };
 
@@ -656,21 +735,31 @@ pub mod io {
                 }
                 &MenuTree::Variant(ref ch) => {
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+
+                    begin_item(r);
+                    if let Some((ref label, ref tree, _)) = ch.choice {
+                        render_choice_label(&label, r);
+                        render_tree(tree, r);
+                    } else {
+                        r.text(&format!("___"), &blank_atts());
+                    };
+                    r.end();
+
                     for (l, t, ty) in ch.before.iter() {
                         begin_item(r);
-                        render_variant_label(l, r);
+                        render_variant_label(false, l, r);
                         render_tree(t, r);
                         r.end()
                     }
                     if let Some((ref l, ref tree, ref _tree_t)) = ch.choice {
                         begin_item(r);
-                        render_variant_label(l, r);
+                        render_variant_label(true, l, r);
                         render_tree(&tree, r);
                         r.end();
                     };
                     for (l, t, ty) in ch.after.iter() {
                         begin_item(r);
-                        render_variant_label(l, r);
+                        render_variant_label(false, l, r);
                         render_tree(t, r);
                         r.end()
                     }
@@ -705,7 +794,7 @@ pub mod io {
             //info!("render_tree({:?}): end.", tree);
             r.end();
         };
-        info!("render_menu_begin");
+        //info!("render_menu_begin");
         let mut r = Render::new();
         r.begin(&Name::Void, FrameType::Flow(sub_flow()));
         r.fill(black_fill());
@@ -736,7 +825,7 @@ pub mod io {
         }
         r.str("}", &meta_atts());
         r.end();
-        info!("render_menu_end");
+        //info!("render_menu_end");
         Ok(r.into_elms())
     }
 }

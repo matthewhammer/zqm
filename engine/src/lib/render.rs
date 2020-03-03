@@ -90,7 +90,7 @@ impl Render {
     }
 
     pub fn rect(&mut self, r: &Rect, f: Fill) {
-        trace!("rect({:?}, {:?})", r, f);
+        //trace!("rect({:?}, {:?})", r, f);
         self.frame.elms.push(Elm::Rect(r.clone(), f))
     }
 
@@ -135,7 +135,7 @@ impl Render {
     }
 
     pub fn text(&mut self, text: &String, ta: &TextAtts) {
-        info!("{}", text);
+        //info!("{}", text);
         assert_eq!(ta.glyph_dim.width, 5);
         assert_eq!(ta.glyph_dim.height, 5);
         let gm = glyph::cap5x5::glyph_map();
