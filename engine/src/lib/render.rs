@@ -238,6 +238,7 @@ fn reposition_elms(elms: &Elms, flow: FlowAtts) -> (Elms, Rect) {
         match flow.dir {
             Dir2D::Right => {
                 next_pos.x += (bounding_rect_of_elm(elm).dim.width + flow.padding) as isize
+                // xxx
             }
             Dir2D::Left => {
                 next_pos.x -= (bounding_rect_of_elm(elm).dim.width + flow.padding) as isize

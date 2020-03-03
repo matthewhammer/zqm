@@ -18,6 +18,7 @@ pub enum MenuType {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum PrimType {
+    Unit,
     Nat,
     Text,
     Bool,
@@ -34,6 +35,7 @@ pub enum MenuTree {
     Nat(Nat),
     Text(Text),
     Bool(bool),
+    Unit,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -72,6 +74,7 @@ pub enum Tag {
     Option,
     Vec,
     Tup,
+    Unit,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -366,7 +369,10 @@ pub mod semantics {
                     None => Err("no choice subtree".to_string()),
                 }
             }
-            _ => unimplemented!(),
+            _ => {
+                // to do
+                Err("not implemented".to_string())
+            }
         }
     }
 
@@ -420,18 +426,45 @@ pub mod semantics {
                     }
                 }
             }
-            _ => unreachable!(),
+            _ => Err("expected tree to be a variant".to_string()),
         }
     }
 
     pub fn next_sibling(menu: &mut MenuState) -> Res {
-        unimplemented!()
+        match menu.ctx.clone() {
+            MenuCtx::Product(mut sel) => {
+                sel.before
+                    .push((sel.label, menu.tree.clone(), menu.tree_typ.clone()));
+                if sel.after.len() > 0 {
+                    sel.after.rotate_left(1);
+                    let (label, tree, tree_typ) = sel.after.pop().unwrap();
+                    sel.label = label;
+                    menu.tree = tree;
+                    menu.tree_typ = tree_typ;
+                    menu.ctx = MenuCtx::Product(sel);
+                    Ok(())
+                } else {
+                    ascend(menu)?;
+                    next_sibling(menu)
+                }
+            }
+            MenuCtx::Root => Ok(()),
+            MenuCtx::Variant(_) => {
+                ascend(menu)?;
+                next_sibling(menu)
+            }
+            _ => {
+                error!("{:?}", menu.ctx);
+                Ok(())
+            }
+        }
     }
 
     pub fn prev_sibling(menu: &mut MenuState) -> Res {
-        unimplemented!()
+        Err("unimplemented".to_string())
     }
 
+    // to do -- change name to `tree_update`? -- prefers second tree when they are each non-blank and disagree
     pub fn tree_union(tree1: &MenuTree, tree2: &MenuTree) -> MenuTree {
         // todo -- assert that the blanks' types agree
         match (tree1, tree2) {
@@ -457,6 +490,7 @@ pub mod semantics {
             MenuTree::Blank(typ.clone())
         } else {
             match typ {
+                &MenuType::Prim(PrimType::Unit) => MenuTree::Unit,
                 &MenuType::Prim(PrimType::Nat) => MenuTree::Nat(0),
                 &MenuType::Prim(PrimType::Text) => MenuTree::Text("".to_string()),
                 &MenuType::Prim(PrimType::Bool) => MenuTree::Bool(false),
@@ -680,7 +714,7 @@ pub mod io {
                     for (l, t, ty) in sel.before.iter() {
                         begin_item(r);
                         render_product_label(l, r);
-                        render_tree(t, r);
+                        render_tree(t, false, r);
                         r.end();
                     }
                     {
@@ -692,17 +726,18 @@ pub mod io {
                     for (l, t, ty) in sel.after.iter() {
                         begin_item(r);
                         render_product_label(&l, r);
-                        render_tree(t, r);
+                        render_tree(t, false, r);
                         r.end();
                     }
                     r.end();
                 }
                 &MenuCtx::Variant(ref sel) => {
+                    next_ctx = Some(sel.ctx.clone());
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
                     for (l, t, ty) in sel.before.iter() {
                         begin_item(r);
                         render_variant_label(false, &l, r);
-                        render_tree(t, r);
+                        render_tree(t, false, r);
                         r.end()
                     }
                     {
@@ -716,7 +751,7 @@ pub mod io {
                     for (l, t, ty) in sel.after.iter() {
                         begin_item(r);
                         render_variant_label(false, &l, r);
-                        render_tree(t, r);
+                        render_tree(t, false, r);
                         r.end()
                     }
                     r.end();
@@ -727,17 +762,15 @@ pub mod io {
             };
             r.end();
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
-            if false {
-                if let Some(ctx) = next_ctx {
-                    info!("--- context continues... ---");
-                    render_ctx(&ctx, r)
-                } else {
-                    info!("context end: root.");
-                }
+            if let Some(ctx) = next_ctx {
+                //info!("--- context continues... ---");
+                render_ctx(&ctx, r)
+            } else {
+                //info!("context end: root.");
             };
         };
 
-        fn render_tree(tree: &MenuTree, r: &mut Render) {
+        fn render_tree(tree: &MenuTree, show_detailed: bool, r: &mut Render) {
             //info!("render_tree({:?}): begin", tree);
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             match tree {
@@ -746,7 +779,7 @@ pub mod io {
                     for (l, t, ty) in fields.iter() {
                         begin_item(r);
                         render_product_label(l, r);
-                        render_tree(t, r);
+                        render_tree(t, false, r);
                         r.end()
                     }
                     r.end()
@@ -757,29 +790,30 @@ pub mod io {
                     begin_item(r);
                     if let Some((ref label, ref tree, _)) = ch.choice {
                         render_choice_label(&label, r);
-                        render_tree(tree, r);
+                        render_tree(tree, false, r);
                     } else {
                         r.text(&format!("___"), &blank_atts());
                     };
                     r.end();
-
-                    for (l, t, ty) in ch.before.iter() {
-                        begin_item(r);
-                        render_variant_label(false, l, r);
-                        render_tree(t, r);
-                        r.end()
-                    }
-                    if let Some((ref l, ref tree, ref _tree_t)) = ch.choice {
-                        begin_item(r);
-                        render_variant_label(true, l, r);
-                        render_tree(&tree, r);
-                        r.end();
-                    };
-                    for (l, t, ty) in ch.after.iter() {
-                        begin_item(r);
-                        render_variant_label(false, l, r);
-                        render_tree(t, r);
-                        r.end()
+                    if show_detailed {
+                        for (l, t, ty) in ch.before.iter() {
+                            begin_item(r);
+                            render_variant_label(false, l, r);
+                            render_tree(t, false, r);
+                            r.end()
+                        }
+                        if let Some((ref l, ref tree, ref _tree_t)) = ch.choice {
+                            begin_item(r);
+                            render_variant_label(true, l, r);
+                            render_tree(&tree, false, r);
+                            r.end();
+                        };
+                        for (l, t, ty) in ch.after.iter() {
+                            begin_item(r);
+                            render_variant_label(false, l, r);
+                            render_tree(t, false, r);
+                            r.end()
+                        }
                     }
                     r.end()
                 }
@@ -787,19 +821,19 @@ pub mod io {
                     if flag {
                         r.str("?", &text_atts())
                     };
-                    render_tree(&*tree, r)
+                    render_tree(&*tree, false, r)
                 }
                 &MenuTree::Vec(ref trees, ref _typ) => {
                     r.begin(&Name::Void, FrameType::Flow(vec_flow()));
                     for tree in trees.iter() {
-                        render_tree(tree, r)
+                        render_tree(tree, false, r)
                     }
                     r.end();
                 }
                 &MenuTree::Tup(ref trees) => {
                     r.begin(&Name::Void, FrameType::Flow(tup_flow()));
                     for (tree, _typ) in trees.iter() {
-                        render_tree(tree, r)
+                        render_tree(tree, false, r)
                     }
                     r.end();
                 }
@@ -808,6 +842,7 @@ pub mod io {
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
                 &MenuTree::Bool(b) => r.text(&format!("{}", b), &text_atts()),
                 &MenuTree::Text(ref t) => r.text(t, &text_atts()),
+                &MenuTree::Unit => r.str("()", &text_atts()),
             };
             //info!("render_tree({:?}): end.", tree);
             r.end();
@@ -831,7 +866,7 @@ pub mod io {
             r.str("tree=", &meta_atts());
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             {
-                render_tree(&menu.tree, &mut r);
+                render_tree(&menu.tree, true, &mut r);
             }
             r.end();
             r.end();
