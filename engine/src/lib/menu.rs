@@ -88,17 +88,17 @@ pub enum AutoCommand {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum EditCommand {
-    GotoRoot,       // Escape
+    GotoRoot,       // ---?
     AutoFill,       // Tab
     NextTree,       // ArrowRight
     PrevTree,       // ArrowLeft
-    NextBlank,      // ?
-    PrevBlank,      // ?
+    NextBlank,      // ---?
+    PrevBlank,      // ---?
     NextVariant,    // ArrowRight
     PrevVariant,    // ArrowLefet
     AcceptVariant,  // Enter
-    VecInsertBlank, // Comma
-    VecInsertAuto,  // Shift-Comma
+    VecInsertBlank, // ---?
+    VecInsertAuto,  // ---?
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
@@ -170,10 +170,19 @@ pub mod semantics {
                 menu.tree = tree;
                 Ok(())
             }
-            &EditCommand::NextBlank => next_blank(menu).map(|_| ()),
-            &EditCommand::PrevBlank => prev_blank(menu).map(|_| ()),
             &EditCommand::NextTree => next_tree(menu).map(|_| ()),
             &EditCommand::PrevTree => prev_tree(menu).map(|_| ()),
+
+            &EditCommand::NextVariant => cycle_variant(menu, Dir1D::Forward),
+            &EditCommand::PrevVariant => cycle_variant(menu, Dir1D::Backward),
+            &EditCommand::AcceptVariant => {
+                assert_tree_tag(&menu.tree, &Tag::Variant)?;
+                ascend(menu)
+            }
+
+            &EditCommand::NextBlank => next_blank(menu).map(|_| ()),
+            &EditCommand::PrevBlank => prev_blank(menu).map(|_| ()),
+
             &EditCommand::VecInsertBlank => {
                 assert_tree_tag(&menu.tree, &Tag::Vec)?;
                 unimplemented!()
@@ -182,12 +191,6 @@ pub mod semantics {
                 assert_tree_tag(&menu.tree, &Tag::Vec)?;
                 state_eval_command(menu, &EditCommand::VecInsertBlank)?;
                 state_eval_command(menu, &EditCommand::AutoFill)
-            }
-            &EditCommand::NextVariant => cycle_variant(menu, Dir1D::Forward),
-            &EditCommand::PrevVariant => cycle_variant(menu, Dir1D::Backward),
-            &EditCommand::AcceptVariant => {
-                assert_tree_tag(&menu.tree, &Tag::Variant)?;
-                ascend(menu)
             }
             _ => unimplemented!(),
         }
@@ -348,7 +351,7 @@ pub mod semantics {
                 let trees = trees.clone();
                 match trees.choice {
                     Some((label, tree, tree_t)) => match dir {
-                        Dir1D::Forward => {
+                        Dir1D::Forward | Dir1D::Backward => {
                             menu.tree = tree;
                             menu.tree_typ = tree_t;
                             menu.ctx = MenuCtx::Variant(Box::new(LabelSelect {
@@ -357,10 +360,8 @@ pub mod semantics {
                                 label: label,
                                 after: trees.after.clone(),
                             }));
-                            info!("{:?} {:?} {:?}", menu.tree, menu.tree_typ, menu.ctx);
                             Ok(())
                         }
-                        Dir1D::Backward => unimplemented!(),
                     },
                     None => Err("no choice subtree".to_string()),
                 }
@@ -395,15 +396,32 @@ pub mod semantics {
                             Ok(())
                         }
                     }
-                    Dir1D::Backward => unimplemented!(),
+                    Dir1D::Backward => {
+                        if arms.before.len() > 0 {
+                            let (label, tree, tree_t) = arms.before.pop().unwrap();
+                            if let Some(ch) = arms.choice {
+                                let mut after_ch = arms.after;
+                                arms.after = vec![ch];
+                                arms.after.append(&mut after_ch);
+                            }
+                            arms.choice = Some((label, tree, tree_t));
+                            menu.tree = MenuTree::Variant(arms);
+                            Ok(())
+                        } else {
+                            if let Some(ch) = arms.choice {
+                                arms.before = vec![ch];
+                                arms.choice = None;
+                            }
+                            arms.before.append(&mut arms.after);
+                            arms.after = vec![];
+                            menu.tree = MenuTree::Variant(arms);
+                            Ok(())
+                        }
+                    }
                 }
             }
             _ => unreachable!(),
         }
-    }
-
-    pub fn prev_variant(menu: &mut MenuState) -> Res {
-        unimplemented!()
     }
 
     pub fn next_sibling(menu: &mut MenuState) -> Res {

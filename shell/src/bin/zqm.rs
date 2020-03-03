@@ -82,6 +82,8 @@ use sdl2::render::{Canvas, RenderTarget};
 pub fn draw_elms<T: RenderTarget>(
     canvas: &mut Canvas<T>,
     pos: &render::Pos,
+    dim: &render::Dim,
+    fill: &render::Fill,
     elms: &render::Elms,
 ) -> Result<(), String> {
     fn translate_color(c: &render::Color) -> sdl2::pixels::Color {
@@ -124,6 +126,12 @@ pub fn draw_elms<T: RenderTarget>(
         }
     };
     use zqm_engine::types::render::{Elm, Fill};
+    draw_rect::<T>(
+        canvas,
+        &pos,
+        &render::Rect::new(0, 0, dim.width, dim.height),
+        fill,
+    );
     for elm in elms.iter() {
         match &elm {
             &Elm::Node(node) => {
@@ -131,13 +139,15 @@ pub fn draw_elms<T: RenderTarget>(
                     x: pos.x + node.rect.pos.x,
                     y: pos.y + node.rect.pos.y,
                 };
-                draw_rect::<T>(
-                    canvas,
-                    &pos,
-                    &render::Rect::new(0, 0, node.rect.dim.width, node.rect.dim.height),
-                    &node.fill,
-                );
-                draw_elms(canvas, &pos, &node.children)?;
+                if false {
+                    draw_rect::<T>(
+                        canvas,
+                        &pos,
+                        &render::Rect::new(0, 0, node.rect.dim.width, node.rect.dim.height),
+                        &node.fill,
+                    );
+                }
+                draw_elms(canvas, &pos, &node.rect.dim, &node.fill, &node.children)?;
             }
             &Elm::Rect(r, f) => draw_rect(canvas, pos, r, f),
         }
@@ -183,17 +193,17 @@ fn translate_system_event(event: SysEvent) -> Option<event::Event> {
 pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     use sdl2::event::EventType;
 
-    let grid_size = (16, 16);
-    let zoom = 32u32;
+    let pos = render::Pos { x: 0, y: 0 };
+    let dim = render::Dim {
+        width: 640,
+        height: 480,
+    };
+    let fill = render::Fill::Closed(render::Color::RGB(0, 0, 0));
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let window = video_subsystem
-        .window(
-            "zoom-quilt-machine",
-            grid_size.0 * (zoom + 4),
-            grid_size.1 * (zoom + 4),
-        )
+        .window("zoom-quilt-machine", dim.width as u32, dim.height as u32)
         .position_centered()
         //.resizable()
         //.input_grabbed()
@@ -213,7 +223,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     {
         // draw initial frame, before waiting for any events
         let elms = eval::render_elms(state)?;
-        draw_elms(&mut canvas, &render::Pos { x: 10, y: 10 }, &elms)?;
+        draw_elms(&mut canvas, &pos, &dim, &fill, &elms)?;
         canvas.present();
         drop(elms);
     }
@@ -239,7 +249,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
                     eval::command_eval(state, c)?;
                 }
                 let elms = eval::render_elms(state)?;
-                draw_elms(&mut canvas, &render::Pos { x: 10, y: 10 }, &elms)?;
+                draw_elms(&mut canvas, &pos, &dim, &fill, &elms)?;
                 canvas.present();
                 drop(elms);
             }
