@@ -204,17 +204,6 @@ pub mod semantics {
         Ok(())
     }
 
-    pub fn tree_is_complete(tree: &MenuTree) -> bool {
-        match tree {
-            MenuTree::Product(trees) => unimplemented!(),
-            MenuTree::Variant(choice) => match &choice.choice {
-                None => false,
-                Some((l, t, t_tt)) => tree_is_complete(t),
-            },
-            _ => unimplemented!(),
-        }
-    }
-
     pub fn goto_root(menu: &mut MenuState) -> Res {
         match menu.ctx {
             MenuCtx::Root => Ok(()),
@@ -469,7 +458,7 @@ pub mod semantics {
         // todo -- assert that the blanks' types agree
         match (tree1, tree2) {
             (&MenuTree::Blank(_), _) => tree2.clone(),
-            (_, &MenuTree::Blank(_)) => tree2.clone(),
+            (_, &MenuTree::Blank(_)) => tree1.clone(),
             (&MenuTree::Variant(ref arms1), &MenuTree::Variant(ref arms2)) => unimplemented!(),
             (&MenuTree::Product(ref fields1), &MenuTree::Product(ref fields2)) => {
                 let mut fields3 = vec![];
@@ -481,6 +470,7 @@ pub mod semantics {
                 }
                 MenuTree::Product(fields3)
             }
+            // to do -- handle other cases by preferring second tree?
             (_, _) => unimplemented!(),
         }
     }
@@ -568,7 +558,12 @@ pub mod io {
         use crate::render::{FlowAtts, FrameType, TextAtts};
 
         fn black_fill() -> Fill {
-            Fill::Closed(Color::RGB(0, 0, 0))
+            //Fill::Closed(Color::RGB(0, 0, 0))
+            Fill::None
+        }
+
+        fn box_fill() -> Fill {
+            Fill::Open(Color::RGB(100, 255, 100), 1)
         }
 
         fn text_zoom() -> usize {
@@ -700,10 +695,13 @@ pub mod io {
             r.begin(&Name::Void, FrameType::Flow(tree_flow))
         }
 
-        fn render_ctx(ctx: &MenuCtx, r: &mut Render) {
+        fn render_ctx(ctx: &MenuCtx, show_detailed: bool, r: &mut Render) {
             let mut next_ctx = None;
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            r.fill(box_fill());
+            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             r.fill(black_fill());
+
             match ctx {
                 &MenuCtx::Root => {
                     r.str("/", &meta_atts());
@@ -734,25 +732,28 @@ pub mod io {
                 &MenuCtx::Variant(ref sel) => {
                     next_ctx = Some(sel.ctx.clone());
                     r.begin(&Name::Void, FrameType::Flow(sub_flow()));
-                    for (l, t, ty) in sel.before.iter() {
-                        begin_item(r);
-                        render_variant_label(false, &l, r);
-                        render_tree(t, false, r);
-                        r.end()
+                    if show_detailed {
+                        for (l, t, ty) in sel.before.iter() {
+                            begin_item(r);
+                            render_variant_label(false, &l, r);
+                            render_tree(t, false, r);
+                            r.end()
+                        }
                     }
                     {
                         begin_item(r);
                         render_variant_label(true, &sel.label, r);
                         r.str("...", &meta_atts());
-                        render_ctx(&sel.ctx, r);
                         r.end();
                         next_ctx = Some(sel.ctx.clone());
                     }
-                    for (l, t, ty) in sel.after.iter() {
-                        begin_item(r);
-                        render_variant_label(false, &l, r);
-                        render_tree(t, false, r);
-                        r.end()
+                    if show_detailed {
+                        for (l, t, ty) in sel.after.iter() {
+                            begin_item(r);
+                            render_variant_label(false, &l, r);
+                            render_tree(t, false, r);
+                            r.end()
+                        }
                     }
                     r.end();
                 }
@@ -761,10 +762,11 @@ pub mod io {
                 &MenuCtx::Tup(ref ch) => unimplemented!(),
             };
             r.end();
+            r.end();
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
             if let Some(ctx) = next_ctx {
                 //info!("--- context continues... ---");
-                render_ctx(&ctx, r)
+                render_ctx(&ctx, false, r)
             } else {
                 //info!("context end: root.");
             };
@@ -841,7 +843,7 @@ pub mod io {
                 &MenuTree::Blank(ref typ) => r.text(&format!("___"), &blank_atts()),
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
                 &MenuTree::Bool(b) => r.text(&format!("{}", b), &text_atts()),
-                &MenuTree::Text(ref t) => r.text(t, &text_atts()),
+                &MenuTree::Text(ref t) => r.text(&format!("{:?}", t), &text_atts()),
                 &MenuTree::Unit => r.str("()", &text_atts()),
             };
             //info!("render_tree({:?}): end.", tree);
@@ -857,7 +859,7 @@ pub mod io {
             r.str("ctx=", &meta_atts());
             r.begin(&Name::Void, FrameType::Flow(tree_flow()));
             {
-                render_ctx(&menu.ctx, &mut r);
+                render_ctx(&menu.ctx, true, &mut r);
             }
             r.end();
             r.end();

@@ -247,7 +247,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
                     // note: we borrow the command here, possibly requiring some cloning when it is evaluated.
                     // todo -- we do nothing with the result; we should log it.
                     match eval::command_eval(state, c) {
-                        Ok(()) => { },
+                        Ok(()) => {}
                         Err(msg) => {
                             warn!("Command {:?} lead to an error:", c);
                             error!("{}", msg)
