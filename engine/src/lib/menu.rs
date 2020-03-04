@@ -579,23 +579,16 @@ pub mod io {
         fn glyph_padding() -> usize {
             1
         }
-
-        fn tree_flow() -> FlowAtts {
+        fn horz_flow() -> FlowAtts {
             FlowAtts {
                 dir: Dir2D::Right,
-                padding: 4,
+                padding: 2,
             }
         };
-        fn ctx_flow() -> FlowAtts {
-            FlowAtts {
-                dir: Dir2D::Left,
-                padding: 4,
-            }
-        };
-        fn sub_flow() -> FlowAtts {
+        fn vert_flow() -> FlowAtts {
             FlowAtts {
                 dir: Dir2D::Down,
-                padding: 4,
+                padding: 2,
             }
         };
 
@@ -691,16 +684,6 @@ pub mod io {
                 },
             }
         };
-        // eventually we want smarter layout algorithms
-        fn tup_flow() -> FlowAtts {
-            sub_flow()
-        };
-        fn vec_flow() -> FlowAtts {
-            sub_flow()
-        };
-        fn menu_flow() -> FlowAtts {
-            tree_flow()
-        };
 
         fn render_choice_label(label: &Label, r: &mut Render) {
             r.str("#", &kw_atts());
@@ -726,22 +709,15 @@ pub mod io {
         }
 
         fn begin_item(r: &mut Render) {
-            let tree_flow = FlowAtts {
-                dir: Dir2D::Right,
-                padding: 2,
-            };
-            r.begin(&Name::Void, FrameType::Flow(tree_flow))
+            r.begin(&Name::Void, FrameType::Flow(horz_flow()))
         }
 
         fn render_ctx(ctx: &MenuCtx, show_detailed: bool, r_out: &mut Render, r_tree: Render) {
             let mut next_ctx = None;
             let mut r = Render::new();
 
-            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            r.begin(&Name::Void, FrameType::Flow(horz_flow()));
             r.fill(ctx_box_fill());
-            r.str(" ", &pad_atts());
-            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
-            r.fill(black_fill());
 
             match ctx {
                 &MenuCtx::Root => {
@@ -751,7 +727,7 @@ pub mod io {
                 }
                 &MenuCtx::Product(ref sel) => {
                     next_ctx = Some(sel.ctx.clone());
-                    r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+                    r.begin(&Name::Void, FrameType::Flow(vert_flow()));
                     for (l, t, ty) in sel.before.iter() {
                         begin_item(&mut r);
                         render_product_label(l, &mut r);
@@ -784,7 +760,6 @@ pub mod io {
                 &MenuCtx::Tup(ref ch) => unimplemented!(),
             };
             r.end();
-            r.end();
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
             if let Some(ctx) = next_ctx {
                 render_ctx(&ctx, false, r_out, r)
@@ -794,16 +769,11 @@ pub mod io {
         };
 
         fn render_tree(tree: &MenuTree, show_detailed: bool, box_fill: &Fill, r: &mut Render) {
-            //info!("render_tree({:?}): begin", tree);
-            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
+            r.begin(&Name::Void, FrameType::Flow(horz_flow()));
             r.fill(box_fill.clone());
-            r.str(" ", &pad_atts());
-            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
-            r.fill(black_fill());
-
             match tree {
                 &MenuTree::Product(ref fields) => {
-                    r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+                    r.begin(&Name::Void, FrameType::Flow(vert_flow()));
                     for (l, t, ty) in fields.iter() {
                         begin_item(r);
                         render_product_label(l, r);
@@ -813,7 +783,7 @@ pub mod io {
                     r.end()
                 }
                 &MenuTree::Variant(ref ch) => {
-                    r.begin(&Name::Void, FrameType::Flow(sub_flow()));
+                    r.begin(&Name::Void, FrameType::Flow(vert_flow()));
 
                     begin_item(r);
                     if let Some((ref label, ref tree, _)) = ch.choice {
@@ -852,14 +822,14 @@ pub mod io {
                     render_tree(&*tree, false, box_fill, r)
                 }
                 &MenuTree::Vec(ref trees, ref _typ) => {
-                    r.begin(&Name::Void, FrameType::Flow(vec_flow()));
+                    r.begin(&Name::Void, FrameType::Flow(horz_flow()));
                     for tree in trees.iter() {
                         render_tree(tree, false, box_fill, r)
                     }
                     r.end();
                 }
                 &MenuTree::Tup(ref trees) => {
-                    r.begin(&Name::Void, FrameType::Flow(tup_flow()));
+                    r.begin(&Name::Void, FrameType::Flow(horz_flow()));
                     for (tree, _typ) in trees.iter() {
                         render_tree(tree, false, box_fill, r)
                     }
@@ -872,29 +842,24 @@ pub mod io {
                 &MenuTree::Text(ref t) => r.text(&format!("{:?}", t), &text_atts()),
                 &MenuTree::Unit => r.str("()", &text_atts()),
             };
-            //info!("render_tree({:?}): end.", tree);
             r.end();
-            r.end();
-        };
-        let mut r_tree = {
-            let mut r_tree = Render::new();
-            r_tree.begin(&Name::Void, FrameType::Flow(tree_flow()));
-            render_tree(&menu.tree, true, &tree_box_fill(), &mut r_tree);
-            r_tree.end();
-            r_tree
         };
         let mut r = Render::new();
-        r.begin(&Name::Void, FrameType::Flow(tree_flow()));
-        r.fill(black_fill());
-        {
-            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
-            r.fill(ctx_box_fill());
-            r.begin(&Name::Void, FrameType::Flow(tree_flow()));
-            {
-                render_ctx(&menu.ctx, false, &mut r, r_tree);
-            }
-            r.end();
-            r.end();
+        r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+        if true {
+            r.str("hello world!", &text_atts());
+            r.str(" please, enter a value to submit:", &text_atts());
+            r.str(
+                " (keys: Tab, Right, Down, Up, Left, Enter, Esc,",
+                &text_atts(),
+            );
+
+            let mut r_tree = {
+                let mut r_tree = Render::new();
+                render_tree(&menu.tree, true, &tree_box_fill(), &mut r_tree);
+                r_tree
+            };
+            render_ctx(&menu.ctx, false, &mut r, r_tree);
         }
         r.end();
         Ok(r.into_elms())

@@ -4,7 +4,7 @@ use bitmap;
 use glyph;
 use types::{
     lang::{Atom, Dir2D, Name},
-    render::{Color, Dim, Elm, Elms, Fill, Node, Pos, Rect},
+    render::{Dim, Elm, Elms, Fill, Node, Pos, Rect},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -89,7 +89,7 @@ impl Render {
             Some(saved) => {
                 let cur = self.frame.clone();
                 self.frame = saved;
-                self.frame.elms.push(elm_of_frame(cur))
+                self.frame.elms.push(util::elm_of_frame(cur))
             }
         }
     }
@@ -140,7 +140,7 @@ impl Render {
     }
 
     pub fn text(&mut self, text: &String, ta: &TextAtts) {
-        //info!("{}", text);
+        //trace!("{}", text);
         assert_eq!(ta.glyph_dim.width, 5);
         assert_eq!(ta.glyph_dim.height, 5);
         let gm = glyph::cap5x5::glyph_map();
@@ -167,120 +167,175 @@ impl Render {
     }
 }
 
-fn bounding_rect_of_elm(elm: &Elm) -> Rect {
-    match elm {
-        Elm::Node(node) => node.rect.clone(),
-        Elm::Rect(r, _) => r.clone(),
+mod util {
+    use super::*;
+
+    fn dim_of_elm(elm: &Elm) -> Dim {
+        match elm {
+            Elm::Node(node) => node.rect.dim.clone(),
+            Elm::Rect(r, _) => r.dim.clone(),
+        }
     }
-}
 
-fn bounding_rect_of_elms(elms: &Elms) -> Rect {
-    use std::cmp::{max, min};
-    let mut bound = Rect::new(
-        isize::max_value(),
-        isize::max_value(),
-        usize::min_value(),
-        usize::min_value(),
-    );
-    for elm in elms.iter() {
-        let rect = bounding_rect_of_elm(elm);
-        bound.pos.x = min(bound.pos.x, rect.pos.x);
-        bound.pos.y = min(bound.pos.y, rect.pos.y);
-        bound.dim.width = max(
-            bound.dim.width,
-            ((rect.pos.x + rect.dim.width as isize) - bound.pos.x) as usize,
-        );
-        bound.dim.height = max(
-            bound.dim.height,
-            ((rect.pos.y + rect.dim.height as isize) - bound.pos.y) as usize,
-        );
-    }
-    bound
-}
-
-fn reposition_rect(rect: &Rect, pos: Pos) -> Rect {
-    Rect {
-        pos,
-        dim: rect.dim.clone(),
-    }
-}
-
-fn reposition_elm(elm: &Elm, pos: Pos) -> Elm {
-    match elm {
-        Elm::Rect(r, f) => Elm::Rect(reposition_rect(r, pos), f.clone()),
-        Elm::Node(node) => Elm::Node(Box::new(Node {
-            rect: reposition_rect(&node.rect, pos),
-            ..*node.clone()
-        })),
-    }
-}
-
-fn reposition_elms(elms: &Elms, flow: FlowAtts) -> (Elms, Rect) {
-    let bound = bounding_rect_of_elms(elms);
-    let mut elms_out = vec![];
-
-    let mut next_pos = match flow.dir {
-        Dir2D::Right => Pos {
-            x: bound.pos.x,
-            y: bound.pos.y,
-        },
-        Dir2D::Down => Pos {
-            x: bound.pos.x,
-            y: bound.pos.y,
-        },
-        Dir2D::Left => Pos {
-            x: bound.pos.x + (bound.dim.width as isize),
-            y: bound.pos.y,
-        },
-        Dir2D::Up => Pos {
-            x: bound.pos.x,
-            y: bound.pos.y + (bound.dim.height as isize),
-        },
-    };
-
-    for elm in elms.iter() {
-        elms_out.push(reposition_elm(elm, next_pos.clone()));
+    fn dim_of_flow(elms: &Elms, flow: &FlowAtts) -> Dim {
+        let mut width = 0;
+        let mut height = 0;
+        trace!("begin dim_of_flow {:?} ==> ...", flow);
+        let padding_sum = flow.padding * 2
+            + if elms.len() == 0 {
+                0
+            } else {
+                ((elms.len() - 1) as usize) * flow.padding
+            };
         match flow.dir {
-            Dir2D::Right => {
-                next_pos.x += (bounding_rect_of_elm(elm).dim.width + flow.padding) as isize
-                // xxx
+            Dir2D::Left | Dir2D::Right => {
+                for elm in elms.iter() {
+                    let dim = dim_of_elm(elm);
+                    width += dim.width;
+                    height = height.max(dim.height);
+                }
+                width += padding_sum;
+                height += 2 * flow.padding;
             }
-            Dir2D::Left => {
-                next_pos.x -= (bounding_rect_of_elm(elm).dim.width + flow.padding) as isize
+            Dir2D::Up | Dir2D::Down => {
+                for elm in elms.iter() {
+                    let dim = dim_of_elm(elm);
+                    trace!(" <elm> ==> {:?}", dim);
+                    height += dim.height;
+                    width = width.max(dim.width);
+                }
+                height += padding_sum;
+                width += 2 * flow.padding;
             }
-            Dir2D::Down => {
-                next_pos.y += (bounding_rect_of_elm(elm).dim.height + flow.padding) as isize
+        }
+        let dim = Dim { width, height };
+        trace!("end dim_of_flow {:?} ==> {:?}", flow, dim);
+        dim
+    }
+
+    fn dim_of_frame(frame: &Frame) -> Dim {
+        let dim = match frame.typ {
+            FrameType::None => {
+                let rect = bounding_rect_of_elms(&frame.elms);
+                assert!(rect.pos.x >= 0);
+                assert!(rect.pos.y >= 0);
+                Dim {
+                    width: (rect.pos.x as usize) + rect.dim.width,
+                    height: (rect.pos.y as usize) + rect.dim.height,
+                }
             }
-            Dir2D::Up => {
-                next_pos.y -= (bounding_rect_of_elm(elm).dim.height + flow.padding) as isize
-            }
+            FrameType::Flow(ref flow) => dim_of_flow(&frame.elms, flow),
+        };
+        trace!("dim_of_frame {:?} ==> {:?}", frame.typ, dim);
+        dim
+    }
+
+    fn bounding_rect_of_elm(elm: &Elm) -> Rect {
+        match elm {
+            Elm::Node(node) => node.rect.clone(),
+            Elm::Rect(r, _) => r.clone(),
         }
     }
-    let rect_out = bounding_rect_of_elms(&elms_out);
-    (elms_out, rect_out)
-}
 
-fn elm_of_elms(name: Name, elms: Elms, rect: Rect, fill: Fill) -> Elm {
-    fn node_of_elms(name: Name, elms: Elms, rect: Rect, fill: Fill) -> Node {
-        Node {
-            name: name,
+    fn bounding_rect_of_elms(elms: &Elms) -> Rect {
+        use std::cmp::{max, min};
+        let mut bound = Rect::new(
+            isize::max_value(),
+            isize::max_value(),
+            usize::min_value(),
+            usize::min_value(),
+        );
+        for elm in elms.iter() {
+            let rect = bounding_rect_of_elm(elm);
+            bound.pos.x = min(bound.pos.x, rect.pos.x);
+            bound.pos.y = min(bound.pos.y, rect.pos.y);
+            bound.dim.width = max(
+                bound.dim.width,
+                ((rect.pos.x + rect.dim.width as isize) - bound.pos.x) as usize,
+            );
+            bound.dim.height = max(
+                bound.dim.height,
+                ((rect.pos.y + rect.dim.height as isize) - bound.pos.y) as usize,
+            );
+        }
+        bound
+    }
+
+    fn reposition_rect(rect: &Rect, pos: Pos) -> Rect {
+        Rect {
+            pos,
+            dim: rect.dim.clone(),
+        }
+    }
+
+    fn reposition_elm(elm: &Elm, pos: Pos) -> Elm {
+        match elm {
+            Elm::Rect(r, f) => Elm::Rect(reposition_rect(r, pos), f.clone()),
+            Elm::Node(node) => Elm::Node(Box::new(Node {
+                rect: reposition_rect(&node.rect, pos),
+                ..*node.clone()
+            })),
+        }
+    }
+
+    fn reposition_frame_elms(frame: &Frame) -> (Elms, Rect) {
+        let dim = dim_of_frame(&frame);
+        let mut elms_out = vec![];
+        let mut pos_out = Pos { x: 0, y: 0 };
+        match frame.typ.clone() {
+            FrameType::None => {
+                elms_out = frame.elms.clone();
+                let rect = bounding_rect_of_elms(&frame.elms);
+                pos_out = rect.pos;
+            }
+            FrameType::Flow(flow) => {
+                let mut next_pos = match flow.dir {
+                    Dir2D::Right => Pos {
+                        x: flow.padding as isize,
+                        y: flow.padding as isize,
+                    },
+                    Dir2D::Down => Pos {
+                        x: flow.padding as isize,
+                        y: flow.padding as isize,
+                    },
+                    Dir2D::Left => Pos {
+                        x: (flow.padding + dim.width) as isize,
+                        y: flow.padding as isize,
+                    },
+                    Dir2D::Up => Pos {
+                        x: flow.padding as isize,
+                        y: (flow.padding + dim.height) as isize,
+                    },
+                };
+                for elm in frame.elms.iter() {
+                    elms_out.push(reposition_elm(elm, next_pos.clone()));
+                    let dim = dim_of_elm(elm);
+                    match flow.dir {
+                        Dir2D::Right => next_pos.x += (dim.width + flow.padding) as isize,
+                        Dir2D::Left => next_pos.x -= (dim.width + flow.padding) as isize,
+                        Dir2D::Down => next_pos.y += (dim.height + flow.padding) as isize,
+                        Dir2D::Up => next_pos.y -= (dim.height + flow.padding) as isize,
+                    }
+                }
+            }
+        };
+        trace!("reposition_elms ==> <elms> {:?} {:?}", pos_out, dim);
+        (
+            elms_out,
+            Rect {
+                pos: pos_out,
+                dim: dim,
+            },
+        )
+    }
+
+    pub fn elm_of_frame(frame: Frame) -> Elm {
+        let (elms, rect) = reposition_frame_elms(&frame);
+        Elm::Node(Box::new(Node {
+            name: frame.name,
             rect: rect,
-            fill: fill,
+            fill: frame.fill,
             children: elms,
-        }
-    };
-    Elm::Node(Box::new(node_of_elms(name, elms, rect, fill)))
-}
-
-fn elm_of_frame(frame: Frame) -> Elm {
-    match frame.typ {
-        FrameType::None => {
-            let rect = bounding_rect_of_elms(&frame.elms);
-            elm_of_elms(frame.name, frame.elms, rect, frame.fill)
-        }
-        FrameType::Flow(flow) => {
-            let (elms, rect) = reposition_elms(&frame.elms, flow);
-            elm_of_elms(frame.name, elms, rect, frame.fill)
-        }
+        }))
     }
 }
