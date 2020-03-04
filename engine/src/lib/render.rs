@@ -74,6 +74,11 @@ impl Render {
         self.frame = new_frame;
     }
 
+    pub fn nest(&mut self, name: &Name, r: Render) {
+        let mut r_elms = r.into_elms();
+        self.frame.elms.append(&mut r_elms);
+    }
+
     pub fn fill(&mut self, f: Fill) {
         self.frame.fill = f;
     }
