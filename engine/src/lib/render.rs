@@ -26,7 +26,8 @@ pub struct TextAtts {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct FlowAtts {
     pub dir: Dir2D,
-    pub padding: usize,
+    pub intra_pad: usize,
+    pub inter_pad: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -181,11 +182,11 @@ mod util {
         let mut width = 0;
         let mut height = 0;
         trace!("begin dim_of_flow {:?} ==> ...", flow);
-        let padding_sum = flow.padding * 2
+        let intra_pad_sum = flow.inter_pad * 2
             + if elms.len() == 0 {
                 0
             } else {
-                ((elms.len() - 1) as usize) * flow.padding
+                ((elms.len() - 1) as usize) * flow.intra_pad
             };
         match flow.dir {
             Dir2D::Left | Dir2D::Right => {
@@ -194,8 +195,8 @@ mod util {
                     width += dim.width;
                     height = height.max(dim.height);
                 }
-                width += padding_sum;
-                height += 2 * flow.padding;
+                width += intra_pad_sum;
+                height += 2 * flow.inter_pad;
             }
             Dir2D::Up | Dir2D::Down => {
                 for elm in elms.iter() {
@@ -204,8 +205,8 @@ mod util {
                     height += dim.height;
                     width = width.max(dim.width);
                 }
-                height += padding_sum;
-                width += 2 * flow.padding;
+                height += intra_pad_sum;
+                width += 2 * flow.inter_pad;
             }
         }
         let dim = Dim { width, height };
@@ -289,32 +290,27 @@ mod util {
                 pos_out = rect.pos;
             }
             FrameType::Flow(flow) => {
+                let p = flow.inter_pad as isize;
                 let mut next_pos = match flow.dir {
-                    Dir2D::Right => Pos {
-                        x: flow.padding as isize,
-                        y: flow.padding as isize,
-                    },
-                    Dir2D::Down => Pos {
-                        x: flow.padding as isize,
-                        y: flow.padding as isize,
-                    },
+                    Dir2D::Right => Pos { x: p, y: p },
+                    Dir2D::Down => Pos { x: p, y: p },
                     Dir2D::Left => Pos {
-                        x: (flow.padding + dim.width) as isize,
-                        y: flow.padding as isize,
+                        x: p + (dim.width as isize),
+                        y: p,
                     },
                     Dir2D::Up => Pos {
-                        x: flow.padding as isize,
-                        y: (flow.padding + dim.height) as isize,
+                        x: p,
+                        y: p + (dim.height as isize),
                     },
                 };
                 for elm in frame.elms.iter() {
                     elms_out.push(reposition_elm(elm, next_pos.clone()));
                     let dim = dim_of_elm(elm);
                     match flow.dir {
-                        Dir2D::Right => next_pos.x += (dim.width + flow.padding) as isize,
-                        Dir2D::Left => next_pos.x -= (dim.width + flow.padding) as isize,
-                        Dir2D::Down => next_pos.y += (dim.height + flow.padding) as isize,
-                        Dir2D::Up => next_pos.y -= (dim.height + flow.padding) as isize,
+                        Dir2D::Right => next_pos.x += (dim.width + flow.intra_pad) as isize,
+                        Dir2D::Left => next_pos.x -= (dim.width + flow.intra_pad) as isize,
+                        Dir2D::Down => next_pos.y += (dim.height + flow.intra_pad) as isize,
+                        Dir2D::Up => next_pos.y -= (dim.height + flow.intra_pad) as isize,
                     }
                 }
             }

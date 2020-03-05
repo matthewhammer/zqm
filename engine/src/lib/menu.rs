@@ -573,6 +573,10 @@ pub mod io {
             Fill::Open(Color::RGB(100, 255, 100), 1)
         }
 
+        fn active_cursor_fill() -> Fill {
+            Fill::Open(Color::RGB(255, 255, 255), 1)
+        }
+
         fn text_zoom() -> usize {
             2
         }
@@ -582,46 +586,40 @@ pub mod io {
         fn horz_flow() -> FlowAtts {
             FlowAtts {
                 dir: Dir2D::Right,
-                padding: 2,
+                intra_pad: 2,
+                inter_pad: 2,
             }
         };
         fn vert_flow() -> FlowAtts {
             FlowAtts {
                 dir: Dir2D::Down,
-                padding: 2,
+                intra_pad: 2,
+                inter_pad: 2,
             }
         };
 
         // eventually we get these atts from
         //  some environment-determined settings
-        fn meta_atts() -> TextAtts {
-            TextAtts {
-                zoom: text_zoom(),
-                fg_fill: Fill::Closed(Color::RGB(255, 200, 255)),
-                bg_fill: Fill::None,
-                glyph_dim: Dim {
-                    width: 5,
-                    height: 5,
-                },
-                glyph_flow: FlowAtts {
-                    dir: Dir2D::Right,
-                    padding: glyph_padding(),
-                },
+        fn glyph_flow() -> FlowAtts {
+            FlowAtts {
+                dir: Dir2D::Right,
+                intra_pad: glyph_padding(),
+                inter_pad: glyph_padding(),
             }
-        };
+        }
+        fn glyph_dim() -> Dim {
+            Dim {
+                width: 5,
+                height: 5,
+            }
+        }
         fn kw_atts() -> TextAtts {
             TextAtts {
                 zoom: text_zoom(),
                 fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
                 bg_fill: Fill::None,
-                glyph_dim: Dim {
-                    width: 5,
-                    height: 5,
-                },
-                glyph_flow: FlowAtts {
-                    dir: Dir2D::Right,
-                    padding: glyph_padding(),
-                },
+                glyph_dim: glyph_dim(),
+                glyph_flow: glyph_flow(),
             }
         };
         fn text_atts() -> TextAtts {
@@ -629,14 +627,8 @@ pub mod io {
                 zoom: text_zoom(),
                 fg_fill: Fill::Closed(Color::RGB(200, 200, 200)),
                 bg_fill: Fill::None,
-                glyph_dim: Dim {
-                    width: 5,
-                    height: 5,
-                },
-                glyph_flow: FlowAtts {
-                    dir: Dir2D::Right,
-                    padding: glyph_padding(),
-                },
+                glyph_dim: glyph_dim(),
+                glyph_flow: glyph_flow(),
             }
         };
         fn blank_atts() -> TextAtts {
@@ -644,14 +636,8 @@ pub mod io {
                 zoom: text_zoom(),
                 fg_fill: Fill::Closed(Color::RGB(255, 200, 200)),
                 bg_fill: Fill::Closed(Color::RGB(100, 0, 0)),
-                glyph_dim: Dim {
-                    width: 5,
-                    height: 5,
-                },
-                glyph_flow: FlowAtts {
-                    dir: Dir2D::Right,
-                    padding: glyph_padding(),
-                },
+                glyph_dim: glyph_dim(),
+                glyph_flow: glyph_flow(),
             }
         };
         fn pad_atts() -> TextAtts {
@@ -659,14 +645,8 @@ pub mod io {
                 zoom: 1,
                 fg_fill: Fill::None,
                 bg_fill: Fill::None,
-                glyph_dim: Dim {
-                    width: 5,
-                    height: 5,
-                },
-                glyph_flow: FlowAtts {
-                    dir: Dir2D::Right,
-                    padding: 0,
-                },
+                glyph_dim: glyph_dim(),
+                glyph_flow: glyph_flow(),
             }
         };
         fn cursor_atts() -> TextAtts {
@@ -674,14 +654,8 @@ pub mod io {
                 zoom: text_zoom(),
                 fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
                 bg_fill: Fill::None,
-                glyph_dim: Dim {
-                    width: 5,
-                    height: 5,
-                },
-                glyph_flow: FlowAtts {
-                    dir: Dir2D::Right,
-                    padding: 1,
-                },
+                glyph_dim: glyph_dim(),
+                glyph_flow: glyph_flow(),
             }
         };
 
@@ -856,7 +830,10 @@ pub mod io {
 
             let mut r_tree = {
                 let mut r_tree = Render::new();
+                r_tree.begin(&Name::Void, FrameType::Flow(vert_flow()));
+                r_tree.fill(active_cursor_fill());
                 render_tree(&menu.tree, true, &tree_box_fill(), &mut r_tree);
+                r_tree.end();
                 r_tree
             };
             render_ctx(&menu.ctx, false, &mut r, r_tree);
