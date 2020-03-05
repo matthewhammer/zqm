@@ -492,10 +492,7 @@ pub mod semantics {
                 }
             }
             MenuCtx::Root(_) => Ok(()),
-            MenuCtx::Variant(_) => {
-                ascend(menu)?;
-                next_sibling(menu)
-            }
+            MenuCtx::Variant(_) => next_sibling(menu),
             _ => {
                 error!("{:?}", menu.ctx);
                 Ok(())
@@ -518,7 +515,7 @@ pub mod semantics {
                     Ok(())
                 } else {
                     ascend(menu)?;
-                    prev_sibling(menu)
+                    descend(menu, Dir1D::Backward)
                 }
             }
             MenuCtx::Root(_) => Ok(()),
@@ -625,7 +622,9 @@ pub mod io {
             (&Event::Quit { .. }, _, _) => Err(()),
             (&Event::KeyDown(ref kei), ref ctx, ref tree) => match (kei.key.as_str(), ctx, tree) {
                 ("Escape", _, _) => Err(()),
+
                 ("Tab", _, Tag::Blank) => Ok(vec![EditCommand::AutoFill]),
+                ("ArrowRight", _, Tag::Blank) => Ok(vec![EditCommand::AutoFill]),
 
                 ("ArrowLeft", _, _) => Ok(vec![EditCommand::Ascend]),
                 ("ArrowRight", _, _) => Ok(vec![EditCommand::Descend]),
@@ -666,6 +665,10 @@ pub mod io {
         }
 
         fn tree_box_fill() -> Fill {
+            Fill::Open(Color::RGB(50, 100, 50), 1)
+        }
+
+        fn detailed_tree_box_fill() -> Fill {
             Fill::Open(Color::RGB(100, 255, 100), 1)
         }
 
@@ -806,11 +809,8 @@ pub mod io {
                 &MenuCtx::Root(ref t) => {
                     drop(r);
                     r_out.begin(&Name::Void, FrameType::Flow(vert_flow()));
-                    r_out.text(
-                        &format!("Constructing Candid value of type: {:?}", t),
-                        &msg_atts(),
-                    );
                     r_out.nest(&Name::Void, r_tree);
+                    r_out.text(&format!("...of type {:?}", t), &msg_atts());
                     r_out.end();
                     return;
                 }
@@ -860,6 +860,7 @@ pub mod io {
         fn render_tree(tree: &MenuTree, show_detailed: bool, box_fill: &Fill, r: &mut Render) {
             r.begin(&Name::Void, FrameType::Flow(horz_flow()));
             r.fill(box_fill.clone());
+            let box_fill = &tree_box_fill();
             match tree {
                 &MenuTree::Product(ref fields) => {
                     r.begin(&Name::Void, FrameType::Flow(vert_flow()));
@@ -888,6 +889,12 @@ pub mod io {
                             render_variant_label(true, l, r);
                             render_tree(&tree, false, box_fill, r);
                             r.end();
+                        } else {
+                            begin_item(r);
+                            r.text(&format!(">"), &cursor_atts());
+                            r.text(&format!("___"), &blank_atts());
+                            r.text(&format!(" Please, choose one below (Up/Down)"), &msg_atts());
+                            r.end();
                         };
                         for (l, t, ty) in ch.after.iter() {
                             begin_item(r);
@@ -896,24 +903,16 @@ pub mod io {
                             r.end()
                         }
                         r.end();
-                    }
-                    begin_item(r);
-                    if let Some((ref label, ref tree, _)) = ch.choice {
-                        render_choice_label(&label, r);
-                        render_tree(tree, false, box_fill, r);
-                        if show_detailed {
-                            r.text(&format!(" (Up/Down/Right)"), &msg_atts());
-                        }
                     } else {
-                        if show_detailed {
-                            r.text(&format!(">"), &cursor_atts());
+                        if let Some((ref label, ref tree, _)) = ch.choice {
+                            begin_item(r);
+                            render_choice_label(&label, r);
+                            render_tree(tree, false, box_fill, r);
+                            r.end();
+                        } else {
+                            r.text(&format!("___"), &blank_atts());
                         }
-                        r.text(&format!("___"), &blank_atts());
-                        if show_detailed {
-                            r.text(&format!(" Please, choose one above (Up/Down)"), &msg_atts());
-                        }
-                    };
-                    r.end();
+                    }
                     r.end();
                 }
                 &MenuTree::Option(flag, ref tree, ref typ) => {
@@ -959,7 +958,7 @@ pub mod io {
                 let mut r_tree = Render::new();
                 r_tree.begin(&Name::Void, FrameType::Flow(vert_flow()));
                 r_tree.fill(active_cursor_fill());
-                render_tree(&menu.tree, true, &tree_box_fill(), &mut r_tree);
+                render_tree(&menu.tree, true, &detailed_tree_box_fill(), &mut r_tree);
                 r_tree.end();
                 r_tree
             };
