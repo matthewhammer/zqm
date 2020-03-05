@@ -66,7 +66,7 @@ pub enum Error {
     Blank(Tag),                      // found blank vs expected completed 'tag'
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum Tag {
     Prim(PrimType),
     Variant,
@@ -74,7 +74,7 @@ pub enum Tag {
     Option,
     Vec,
     Tup,
-    Unit,
+    Blank,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -91,6 +91,10 @@ pub enum AutoCommand {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum EditCommand {
+    Descend,
+    Ascend,
+    PrevSibling,
+    NextSibling,
     GotoRoot,       // ---?
     AutoFill,       // Tab
     NextTree,       // ArrowRight
@@ -113,7 +117,7 @@ pub enum Command {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum MenuCtx {
-    Root,
+    Root(MenuType),
     Product(Box<LabelSelect>),
     Variant(Box<LabelSelect>),
     Option(bool, Box<MenuCtx>),
@@ -147,7 +151,7 @@ pub mod semantics {
             Command::Init(InitCommand::Default(ref default_choice, ref typ)) => {
                 menu.state = Some(MenuState {
                     root_typ: Rc::new(typ.clone()),
-                    ctx: MenuCtx::Root,
+                    ctx: MenuCtx::Root(typ.clone()),
                     tree: MenuTree::Blank(typ.clone()),
                     tree_typ: typ.clone(),
                 });
@@ -176,6 +180,12 @@ pub mod semantics {
             &EditCommand::NextTree => next_tree(menu).map(|_| ()),
             &EditCommand::PrevTree => prev_tree(menu).map(|_| ()),
 
+            &EditCommand::Ascend => ascend(menu).map(|_| ()),
+            &EditCommand::Descend => descend(menu, Dir1D::Forward).map(|_| ()),
+
+            &EditCommand::NextSibling => next_sibling(menu).map(|_| ()),
+            &EditCommand::PrevSibling => prev_sibling(menu).map(|_| ()),
+
             &EditCommand::NextVariant => cycle_variant(menu, Dir1D::Forward),
             &EditCommand::PrevVariant => cycle_variant(menu, Dir1D::Backward),
             &EditCommand::AcceptVariant => {
@@ -195,18 +205,62 @@ pub mod semantics {
                 state_eval_command(menu, &EditCommand::VecInsertBlank)?;
                 state_eval_command(menu, &EditCommand::AutoFill)
             }
-            _ => unimplemented!(),
+            _ => {
+                error!("{:?}", command);
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn tree_tag(tree: &MenuTree) -> Tag {
+        match tree {
+            MenuTree::Product(_) => Tag::Product,
+            MenuTree::Variant(_) => Tag::Variant,
+            MenuTree::Option(_, _, _) => Tag::Option,
+            MenuTree::Vec(_, _) => Tag::Vec,
+            MenuTree::Tup(_) => Tag::Tup,
+            MenuTree::Blank(_) => Tag::Blank,
+            MenuTree::Nat(_) => Tag::Prim(PrimType::Nat),
+            MenuTree::Bool(_) => Tag::Prim(PrimType::Bool),
+            MenuTree::Text(_) => Tag::Prim(PrimType::Text),
+            MenuTree::Unit => Tag::Prim(PrimType::Unit),
+        }
+    }
+
+    pub fn ctx_tag(ctx: &MenuCtx) -> Tag {
+        match ctx {
+            MenuCtx::Root(typ) => typ_tag(typ),
+            MenuCtx::Product(_) => Tag::Product,
+            MenuCtx::Variant(_) => Tag::Variant,
+            MenuCtx::Option(_, _) => Tag::Option,
+            MenuCtx::Tup(_) => Tag::Tup,
+            MenuCtx::Vec(_) => Tag::Vec,
+        }
+    }
+
+    pub fn typ_tag(typ: &MenuType) -> Tag {
+        match typ {
+            MenuType::Prim(t) => Tag::Prim(t.clone()),
+            MenuType::Product(_) => Tag::Product,
+            MenuType::Variant(_) => Tag::Variant,
+            MenuType::Option(_) => Tag::Option,
+            MenuType::Tup(_) => Tag::Tup,
+            MenuType::Vec(_) => Tag::Vec,
         }
     }
 
     pub fn assert_tree_tag(tree: &MenuTree, tag: &Tag) -> Res {
-        // to do
-        Ok(())
+        let tt = tree_tag(tree);
+        if &tt == tag {
+            Ok(())
+        } else {
+            Err(format!("expected {:?} but found {:?}: {:?}", tag, tt, tree))
+        }
     }
 
     pub fn goto_root(menu: &mut MenuState) -> Res {
         match menu.ctx {
-            MenuCtx::Root => Ok(()),
+            MenuCtx::Root(_) => Ok(()),
             _ => {
                 ascend(menu)?;
                 goto_root(menu)
@@ -262,7 +316,7 @@ pub mod semantics {
 
     pub fn ascend(menu: &mut MenuState) -> Res {
         match menu.ctx.clone() {
-            MenuCtx::Root => Err("cannot ascend: already at root".to_string()),
+            MenuCtx::Root(_) => Err("cannot ascend: already at root".to_string()),
             MenuCtx::Product(mut sel) => {
                 let mut arms = sel.before;
                 arms.push((sel.label, menu.tree.clone(), menu.tree_typ.clone()));
@@ -434,10 +488,10 @@ pub mod semantics {
                     Ok(())
                 } else {
                     ascend(menu)?;
-                    next_sibling(menu)
+                    descend(menu, Dir1D::Forward)
                 }
             }
-            MenuCtx::Root => Ok(()),
+            MenuCtx::Root(_) => Ok(()),
             MenuCtx::Variant(_) => {
                 ascend(menu)?;
                 next_sibling(menu)
@@ -450,7 +504,33 @@ pub mod semantics {
     }
 
     pub fn prev_sibling(menu: &mut MenuState) -> Res {
-        Err("unimplemented".to_string())
+        match menu.ctx.clone() {
+            MenuCtx::Product(mut sel) => {
+                sel.after
+                    .push((sel.label, menu.tree.clone(), menu.tree_typ.clone()));
+                sel.after.rotate_left(1);
+                if sel.before.len() > 0 {
+                    let (label, tree, tree_typ) = sel.before.pop().unwrap();
+                    sel.label = label;
+                    menu.tree = tree;
+                    menu.tree_typ = tree_typ;
+                    menu.ctx = MenuCtx::Product(sel);
+                    Ok(())
+                } else {
+                    ascend(menu)?;
+                    prev_sibling(menu)
+                }
+            }
+            MenuCtx::Root(_) => Ok(()),
+            MenuCtx::Variant(_) => {
+                ascend(menu)?;
+                prev_sibling(menu)
+            }
+            _ => {
+                error!("{:?}", menu.ctx);
+                Ok(())
+            }
+        }
     }
 
     // to do -- change name to `tree_update`? -- prefers second tree when they are each non-blank and disagree
@@ -529,7 +609,10 @@ pub mod semantics {
 }
 
 pub mod io {
-    use super::{EditCommand, Label, MenuCtx, MenuState, MenuTree};
+    use super::{
+        semantics::{ctx_tag, tree_tag},
+        EditCommand, Label, MenuCtx, MenuState, MenuTree, Tag,
+    };
     use render::Render;
     use types::event::Event;
     use types::{
@@ -537,23 +620,36 @@ pub mod io {
         render::{Color, Dim, Elms, Fill},
     };
 
-    pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
-        match event {
-            &Event::Quit { .. } => Err(()),
-            &Event::KeyDown(ref kei) => match kei.key.as_str() {
-                "Escape" => Err(()),
-                "Tab" => Ok(vec![EditCommand::AutoFill]),
+    pub fn edit_commands_of_event(menu: &MenuState, event: &Event) -> Result<Vec<EditCommand>, ()> {
+        match (event, ctx_tag(&menu.ctx), tree_tag(&menu.tree)) {
+            (&Event::Quit { .. }, _, _) => Err(()),
+            (&Event::KeyDown(ref kei), ref ctx, ref tree) => match (kei.key.as_str(), ctx, tree) {
+                ("Escape", _, _) => Err(()),
+                ("Tab", _, Tag::Blank) => Ok(vec![EditCommand::AutoFill]),
 
-                "ArrowLeft" => Ok(vec![EditCommand::PrevTree]),
-                "ArrowRight" => Ok(vec![EditCommand::NextTree]),
+                ("ArrowLeft", _, _) => Ok(vec![EditCommand::Ascend]),
+                ("ArrowRight", _, _) => Ok(vec![EditCommand::Descend]),
 
-                "ArrowUp" => Ok(vec![EditCommand::PrevVariant]),
-                "ArrowDown" => Ok(vec![EditCommand::NextVariant]),
-                "Enter" => Ok(vec![EditCommand::AcceptVariant]),
+                ("ArrowUp", Tag::Variant, _) => Ok(vec![EditCommand::PrevVariant]),
+                ("ArrowDown", Tag::Variant, _) => Ok(vec![EditCommand::NextVariant]),
 
-                _ => Ok(vec![]),
+                ("ArrowUp", Tag::Product, _) => Ok(vec![EditCommand::PrevSibling]),
+                ("ArrowDown", Tag::Product, _) => Ok(vec![EditCommand::NextSibling]),
+
+                ("Enter", _, _) => Ok(vec![EditCommand::Descend]),
+
+                (key, ctx, tree) => {
+                    warn!(
+                        "unrecognized key-tag combo: {:?} on a {:?} context, holding a {:?}",
+                        key, ctx, tree
+                    );
+                    Ok(vec![])
+                }
             },
-            _ => Ok(vec![]),
+            (ev, _, _) => {
+                warn!("unrecognized event: {:?}", ev);
+                Ok(vec![])
+            }
         }
     }
 
@@ -707,9 +803,15 @@ pub mod io {
             r.fill(ctx_box_fill());
 
             match ctx {
-                &MenuCtx::Root => {
+                &MenuCtx::Root(ref t) => {
                     drop(r);
+                    r_out.begin(&Name::Void, FrameType::Flow(vert_flow()));
+                    r_out.text(
+                        &format!("Constructing Candid value of type: {:?}", t),
+                        &msg_atts(),
+                    );
                     r_out.nest(&Name::Void, r_tree);
+                    r_out.end();
                     return;
                 }
                 &MenuCtx::Product(ref sel) => {

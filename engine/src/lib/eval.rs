@@ -22,15 +22,21 @@ pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command
                     .collect()
             })
         }
-        &mut Editor::Menu(ref _ed) => {
+        &mut Editor::Menu(ref mut ed) => {
             // to do -- insert a name into each command that is unique,
             // but whose structure encodes a wallclock timestamp, among other sequence numbers.
-            menu::io::edit_commands_of_event(event).map(|ed_cmds| {
-                ed_cmds
-                    .into_iter()
-                    .map(|ed_cmd| Command::Menu(menu::Command::Edit(ed_cmd)))
-                    .collect()
-            })
+            match ed.state {
+                Some(ref mut st) =>
+  //              Editor::Menu(ref mut menu_state) => {
+                    menu::io::edit_commands_of_event(st, event).map(|ed_cmds| {
+                        ed_cmds
+                            .into_iter()
+                            .map(|ed_cmd| Command::Menu(menu::Command::Edit(ed_cmd)))
+                            .collect()
+                    }),
+
+                    _ => unreachable!()
+            }
         }
         &mut Editor::Chain(ref mut _ed) => unimplemented!(),
         &mut Editor::Grid(ref mut _ed) => unimplemented!(),
