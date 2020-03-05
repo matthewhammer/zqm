@@ -577,6 +577,10 @@ pub mod io {
             Fill::Open(Color::RGB(255, 255, 255), 1)
         }
 
+        fn choice_box_fill() -> Fill {
+            Fill::Open(Color::RGB(255, 255, 255), 1)
+        }
+
         fn text_zoom() -> usize {
             2
         }
@@ -617,6 +621,15 @@ pub mod io {
             TextAtts {
                 zoom: text_zoom(),
                 fg_fill: Fill::Closed(Color::RGB(255, 255, 255)),
+                bg_fill: Fill::None,
+                glyph_dim: glyph_dim(),
+                glyph_flow: glyph_flow(),
+            }
+        };
+        fn msg_atts() -> TextAtts {
+            TextAtts {
+                zoom: (text_zoom() / 2).min(1),
+                fg_fill: Fill::Closed(Color::RGB(200, 200, 255)),
                 bg_fill: Fill::None,
                 glyph_dim: glyph_dim(),
                 glyph_flow: glyph_flow(),
@@ -673,7 +686,7 @@ pub mod io {
 
         fn render_variant_label(is_chosen: bool, label: &Label, r: &mut Render) {
             if is_chosen {
-                r.str("*", &cursor_atts());
+                r.str(">", &cursor_atts());
             } else {
                 r.str(" ", &cursor_atts());
             }
@@ -758,16 +771,10 @@ pub mod io {
                 }
                 &MenuTree::Variant(ref ch) => {
                     r.begin(&Name::Void, FrameType::Flow(vert_flow()));
-
-                    begin_item(r);
-                    if let Some((ref label, ref tree, _)) = ch.choice {
-                        render_choice_label(&label, r);
-                        render_tree(tree, false, box_fill, r);
-                    } else {
-                        r.text(&format!("___"), &blank_atts());
-                    };
-                    r.end();
                     if show_detailed {
+                        r.text(&format!("Choice:"), &msg_atts());
+                        r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+                        r.fill(choice_box_fill());
                         for (l, t, ty) in ch.before.iter() {
                             begin_item(r);
                             render_variant_label(false, l, r);
@@ -786,8 +793,26 @@ pub mod io {
                             render_tree(t, false, box_fill, r);
                             r.end()
                         }
+                        r.end();
                     }
-                    r.end()
+                    begin_item(r);
+                    if let Some((ref label, ref tree, _)) = ch.choice {
+                        render_choice_label(&label, r);
+                        render_tree(tree, false, box_fill, r);
+                        if show_detailed {
+                            r.text(&format!(" (Up/Down/Right)"), &msg_atts());
+                        }
+                    } else {
+                        if show_detailed {
+                            r.text(&format!(">"), &cursor_atts());
+                        }
+                        r.text(&format!("___"), &blank_atts());
+                        if show_detailed {
+                            r.text(&format!(" Please, choose one above (Up/Down)"), &msg_atts());
+                        }
+                    };
+                    r.end();
+                    r.end();
                 }
                 &MenuTree::Option(flag, ref tree, ref typ) => {
                     if flag {
@@ -822,10 +847,10 @@ pub mod io {
         r.begin(&Name::Void, FrameType::Flow(vert_flow()));
         if true {
             r.str("hello world!", &text_atts());
-            r.str(" please, enter a value to submit:", &text_atts());
+            r.str(" please, enter a value to submit:", &msg_atts());
             r.str(
                 " (keys: Tab, Right, Down, Up, Left, Enter, Esc)",
-                &text_atts(),
+                &msg_atts(),
             );
 
             let mut r_tree = {

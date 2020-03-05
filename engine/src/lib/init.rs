@@ -18,84 +18,65 @@ pub fn init_state() -> State {
         } else {
             use crate::menu::{MenuType, PrimType};
 
-            let variant_r_g_b = MenuType::Variant(vec![
+            let uid_person = MenuType::Product(vec![
                 (
-                    Name::Atom(Atom::String("red".to_string())),
-                    MenuType::Prim(PrimType::Unit),
-                ),
-                (
-                    Name::Atom(Atom::String("green".to_string())),
-                    MenuType::Prim(PrimType::Unit),
-                ),
-                (
-                    Name::Atom(Atom::String("blue".to_string())),
-                    MenuType::Prim(PrimType::Unit),
-                ),
-            ]);
-
-            let variant_l_r = MenuType::Variant(vec![
-                (
-                    Name::Atom(Atom::String("nat".to_string())),
+                    Name::Atom(Atom::String("uid".to_string())),
                     MenuType::Prim(PrimType::Nat),
                 ),
                 (
-                    Name::Atom(Atom::String("text".to_string())),
+                    Name::Atom(Atom::String("first".to_string())),
                     MenuType::Prim(PrimType::Text),
                 ),
                 (
-                    Name::Atom(Atom::String("bool".to_string())),
-                    MenuType::Prim(PrimType::Bool),
+                    Name::Atom(Atom::String("last".to_string())),
+                    MenuType::Prim(PrimType::Text),
                 ),
             ]);
 
-            let product_as = MenuType::Product(vec![
+            let person = MenuType::Product(vec![
                 (
-                    Name::Atom(Atom::String("apple".to_string())),
-                    variant_l_r.clone(),
+                    Name::Atom(Atom::String("first".to_string())),
+                    MenuType::Prim(PrimType::Text),
                 ),
                 (
-                    Name::Atom(Atom::String("avocado".to_string())),
-                    variant_l_r.clone(),
-                ),
-            ]);
-
-            let product_bs = MenuType::Product(vec![
-                (
-                    Name::Atom(Atom::String("banana".to_string())),
-                    variant_l_r.clone(),
-                ),
-                (
-                    Name::Atom(Atom::String("broccoli".to_string())),
-                    variant_l_r.clone(),
+                    Name::Atom(Atom::String("last".to_string())),
+                    MenuType::Prim(PrimType::Text),
                 ),
             ]);
 
-            let product_colors = MenuType::Product(vec![
+            let variant_crud = MenuType::Variant(vec![
+                (Name::Atom(Atom::String("create".to_string())), person),
                 (
-                    Name::Atom(Atom::String("fg_color".to_string())),
-                    variant_r_g_b.clone(),
+                    Name::Atom(Atom::String("remove".to_string())),
+                    MenuType::Prim(PrimType::Nat),
                 ),
+                (Name::Atom(Atom::String("update".to_string())), uid_person),
                 (
-                    Name::Atom(Atom::String("bg_color".to_string())),
-                    variant_r_g_b.clone(),
-                ),
-            ]);
-
-            let product_a_b_c = MenuType::Product(vec![
-                (
-                    Name::Atom(Atom::String("a".to_string())),
-                    product_as.clone(),
-                ),
-                (
-                    Name::Atom(Atom::String("b".to_string())),
-                    product_bs.clone(),
-                ),
-                (
-                    Name::Atom(Atom::String("colors".to_string())),
-                    product_colors.clone(),
+                    Name::Atom(Atom::String("delete".to_string())),
+                    MenuType::Prim(PrimType::Nat),
                 ),
             ]);
 
+            let menu = MenuType::Variant(vec![
+                (
+                    Name::Atom(Atom::String("crud".to_string())),
+                    variant_crud.clone(),
+                ),
+                (
+                    Name::Atom(Atom::String("quit".to_string())),
+                    MenuType::Prim(PrimType::Unit),
+                ),
+            ]);
+
+            let config = MenuType::Product(vec![(
+                Name::Atom(Atom::String("text-zoom".to_string())),
+                MenuType::Prim(PrimType::Nat),
+            )]);
+
+            let root = MenuType::Variant(vec![
+                (Name::Atom(Atom::String("menu".to_string())), menu),
+                (Name::Atom(Atom::String("config".to_string())), config),
+            ]);
             (
                 State {
                     editor: Editor::Menu(Box::new(menu::Editor {
@@ -104,8 +85,8 @@ pub fn init_state() -> State {
                     })),
                 },
                 Command::Menu(menu::Command::Init(menu::InitCommand::Default(
-                    menu::MenuTree::Blank(product_a_b_c.clone()),
-                    product_a_b_c,
+                    menu::MenuTree::Blank(root.clone()),
+                    root,
                 ))),
             )
         }
