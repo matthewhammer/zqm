@@ -96,7 +96,6 @@ impl Render {
     }
 
     pub fn rect(&mut self, r: &Rect, f: Fill) {
-        //trace!("rect({:?}, {:?})", r, f);
         self.frame.elms.push(Elm::Rect(r.clone(), f))
     }
 
@@ -141,7 +140,6 @@ impl Render {
     }
 
     pub fn text(&mut self, text: &String, ta: &TextAtts) {
-        //trace!("{}", text);
         assert_eq!(ta.glyph_dim.width, 5);
         assert_eq!(ta.glyph_dim.height, 5);
         let gm = glyph::cap5x5::glyph_map();
@@ -181,7 +179,6 @@ mod util {
     fn dim_of_flow(elms: &Elms, flow: &FlowAtts) -> Dim {
         let mut width = 0;
         let mut height = 0;
-        trace!("begin dim_of_flow {:?} ==> ...", flow);
         let intra_pad_sum = flow.inter_pad * 2
             + if elms.len() == 0 {
                 0
@@ -201,7 +198,6 @@ mod util {
             Dir2D::Up | Dir2D::Down => {
                 for elm in elms.iter() {
                     let dim = dim_of_elm(elm);
-                    trace!(" <elm> ==> {:?}", dim);
                     height += dim.height;
                     width = width.max(dim.width);
                 }
@@ -210,7 +206,6 @@ mod util {
             }
         }
         let dim = Dim { width, height };
-        trace!("end dim_of_flow {:?} ==> {:?}", flow, dim);
         dim
     }
 
@@ -227,7 +222,6 @@ mod util {
             }
             FrameType::Flow(ref flow) => dim_of_flow(&frame.elms, flow),
         };
-        trace!("dim_of_frame {:?} ==> {:?}", frame.typ, dim);
         dim
     }
 
@@ -315,7 +309,6 @@ mod util {
                 }
             }
         };
-        trace!("reposition_elms ==> <elms> {:?} {:?}", pos_out, dim);
         (
             elms_out,
             Rect {

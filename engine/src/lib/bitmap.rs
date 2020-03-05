@@ -274,9 +274,7 @@ pub mod semantics {
 // Step 6:
 // -------
 //
-// Define the IO for the Editor.  We use SDL for system-level IO on Mac/Linux.
-
-// To do: We are going to use our own `render` elements (types::render::Elms) soon.
+// Define the IO for the Editor using the abstract `render` module, and associated types.
 
 pub mod io {
     use super::{Dir2D, EditCommand, EditorState};

@@ -824,7 +824,7 @@ pub mod io {
             r.str("hello world!", &text_atts());
             r.str(" please, enter a value to submit:", &text_atts());
             r.str(
-                " (keys: Tab, Right, Down, Up, Left, Enter, Esc,",
+                " (keys: Tab, Right, Down, Up, Left, Enter, Esc)",
                 &text_atts(),
             );
 
