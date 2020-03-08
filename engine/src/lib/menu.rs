@@ -152,7 +152,7 @@ pub mod semantics {
                 menu.state = Some(MenuState {
                     root_typ: Rc::new(typ.clone()),
                     ctx: MenuCtx::Root(typ.clone()),
-                    tree: MenuTree::Blank(typ.clone()),
+                    tree: default_choice.clone(),
                     tree_typ: typ.clone(),
                 });
                 Ok(())
@@ -161,7 +161,7 @@ pub mod semantics {
                 None => Err("Invalid editor state".to_string()),
                 Some(ref mut st) => state_eval_command(st, c),
             },
-            Command::Auto(ref c) => unimplemented!(),
+            Command::Auto(ref _c) => unimplemented!(),
         };
         debug!("editor_eval({:?}) ==> {:?}", command, res);
         menu.history.push(command.clone());
@@ -204,10 +204,6 @@ pub mod semantics {
                 assert_tree_tag(&menu.tree, &Tag::Vec)?;
                 state_eval_command(menu, &EditCommand::VecInsertBlank)?;
                 state_eval_command(menu, &EditCommand::AutoFill)
-            }
-            _ => {
-                error!("{:?}", command);
-                unimplemented!()
             }
         }
     }
@@ -349,9 +345,9 @@ pub mod semantics {
                 menu.ctx = sel.ctx;
                 Ok(())
             }
-            MenuCtx::Option(flag, menu) => unimplemented!(),
-            MenuCtx::Vec(sel) => unimplemented!(),
-            MenuCtx::Tup(sel) => unimplemented!(),
+            MenuCtx::Option(_flag, _menu) => unimplemented!(),
+            MenuCtx::Vec(_sel) => unimplemented!(),
+            MenuCtx::Tup(_sel) => unimplemented!(),
         }
     }
 
@@ -536,7 +532,7 @@ pub mod semantics {
         match (tree1, tree2) {
             (&MenuTree::Blank(_), _) => tree2.clone(),
             (_, &MenuTree::Blank(_)) => tree1.clone(),
-            (&MenuTree::Variant(ref arms1), &MenuTree::Variant(ref arms2)) => {
+            (&MenuTree::Variant(ref _arms1), &MenuTree::Variant(ref _arms2)) => {
                 // to do
                 unimplemented!()
             }
@@ -607,13 +603,13 @@ pub mod semantics {
 
 pub mod io {
     use super::{
-        semantics::{ctx_tag, tree_tag, typ_tag},
+        semantics::{ctx_tag, tree_tag},
         EditCommand, Label, MenuCtx, MenuState, MenuTree, Tag,
     };
     use render::Render;
     use types::event::Event;
     use types::{
-        lang::{Dir1D, Dir2D, Name},
+        lang::{Dir2D, Name},
         render::{Color, Dim, Elms, Fill},
     };
 
@@ -825,7 +821,7 @@ pub mod io {
             r.begin(&Name::Void, FrameType::Flow(f.clone()))
         }
 
-        fn render_ctx(ctx: &MenuCtx, show_detailed: bool, r_out: &mut Render, r_tree: Render) {
+        fn render_ctx(ctx: &MenuCtx, r_out: &mut Render, r_tree: Render) {
             let mut next_ctx = None;
             let mut r = Render::new();
 
@@ -833,8 +829,11 @@ pub mod io {
             r.fill(ctx_box_fill());
 
             match ctx {
-                &MenuCtx::Root(ref t) => {
+                &MenuCtx::Root(ref _t) => {
                     drop(r);
+                    if let Some(_) = next_ctx {
+                        unreachable!()
+                    };
                     r_out.begin(&Name::Void, FrameType::Flow(vert_flow()));
                     r_out.nest(&Name::Void, r_tree);
                     r_out.end();
@@ -843,7 +842,7 @@ pub mod io {
                 &MenuCtx::Product(ref sel) => {
                     next_ctx = Some(sel.ctx.clone());
                     r.begin(&Name::Void, FrameType::Flow(vert_flow()));
-                    for (l, t, ty) in sel.before.iter() {
+                    for (l, t, _ty) in sel.before.iter() {
                         begin_item(&mut r);
                         render_product_label(l, &mut r);
                         render_tree(t, false, &ctx_box_fill(), &mut r);
@@ -855,7 +854,7 @@ pub mod io {
                         r.nest(&Name::Void, r_tree);
                         r.end();
                     }
-                    for (l, t, ty) in sel.after.iter() {
+                    for (l, t, _ty) in sel.after.iter() {
                         begin_item(&mut r);
                         render_product_label(&l, &mut r);
                         render_tree(t, false, &ctx_box_fill(), &mut r);
@@ -870,14 +869,14 @@ pub mod io {
                     r.nest(&Name::Void, r_tree);
                     r.end();
                 }
-                &MenuCtx::Option(flag, ref body) => unimplemented!(),
-                &MenuCtx::Vec(ref ch) => unimplemented!(),
-                &MenuCtx::Tup(ref ch) => unimplemented!(),
+                &MenuCtx::Option(_flag, ref _body) => unimplemented!(),
+                &MenuCtx::Vec(ref _ch) => unimplemented!(),
+                &MenuCtx::Tup(ref _ch) => unimplemented!(),
             };
             r.end();
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
             if let Some(ctx) = next_ctx {
-                render_ctx(&ctx, false, r_out, r)
+                render_ctx(&ctx, r_out, r)
             } else {
                 //info!("context end: root.");
             };
@@ -944,9 +943,9 @@ pub mod io {
                     }
                     r.end()
                 }
-                MenuType::Option(t) => unimplemented!(),
-                MenuType::Vec(t) => unimplemented!(),
-                MenuType::Tup(fields) => unimplemented!(),
+                MenuType::Option(_t) => unimplemented!(),
+                MenuType::Vec(_t) => unimplemented!(),
+                MenuType::Tup(_fields) => unimplemented!(),
             }
         }
 
@@ -957,7 +956,7 @@ pub mod io {
             match tree {
                 &MenuTree::Product(ref fields) => {
                     r.begin(&Name::Void, FrameType::Flow(vert_flow()));
-                    for (l, t, ty) in fields.iter() {
+                    for (l, t, _ty) in fields.iter() {
                         begin_item(r);
                         render_product_label(l, r);
                         render_tree(t, false, box_fill, r);
@@ -970,7 +969,7 @@ pub mod io {
                     if show_detailed {
                         begin_item(r);
                         r.text(&format!("Choice:"), &msg_atts());
-                        if let Some((ref l, ref tree, ref _tree_t)) = ch.choice {
+                        if let Some(_) = ch.choice {
                             // nothing
                         } else {
                             r.text(&format!("___"), &blank_atts());
@@ -979,7 +978,7 @@ pub mod io {
                         r.end();
                         r.begin(&Name::Void, FrameType::Flow(vert_flow()));
                         r.fill(choice_box_fill());
-                        for (l, t, ty) in ch.before.iter() {
+                        for (l, t, _ty) in ch.before.iter() {
                             begin_item(r);
                             render_variant_label(false, l, r);
                             render_tree(t, false, box_fill, r);
@@ -1002,7 +1001,7 @@ pub mod io {
                                 r.end();
                             }
                         };
-                        for (l, t, ty) in ch.after.iter() {
+                        for (l, t, _ty) in ch.after.iter() {
                             begin_item(r);
                             render_variant_label(false, l, r);
                             render_tree(t, false, box_fill, r);
@@ -1021,7 +1020,7 @@ pub mod io {
                     }
                     r.end();
                 }
-                &MenuTree::Option(flag, ref tree, ref typ) => {
+                &MenuTree::Option(flag, ref tree, ref _typ) => {
                     if flag {
                         r.str("?", &text_atts())
                     };
@@ -1041,7 +1040,7 @@ pub mod io {
                     }
                     r.end();
                 }
-                &MenuTree::Blank(ref typ) => r.text(&format!("___"), &blank_atts()),
+                &MenuTree::Blank(ref _typ) => r.text(&format!("___"), &blank_atts()),
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
                 &MenuTree::Bool(b) => r.text(&format!("{}", b), &text_atts()),
                 &MenuTree::Text(ref t) => r.text(&format!("{:?}", t), &text_atts()),
@@ -1071,7 +1070,7 @@ pub mod io {
                 r_tree.end();
                 r_tree
             };
-            render_ctx(&menu.ctx, false, &mut r, r_tree);
+            render_ctx(&menu.ctx, &mut r, r_tree);
         }
         r.end();
         Ok(r.into_elms())
@@ -1083,13 +1082,12 @@ use std::fmt;
 // move elsewhere
 impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut first = true;
         match self {
             Name::Void => write!(f, "<void>"),
             Name::Atom(Atom::Bool(b)) => write!(f, "{}", b),
             Name::Atom(Atom::Usize(u)) => write!(f, "{}", u),
             Name::Atom(Atom::String(s)) => write!(f, "{}", s),
-            Name::Merkle(m) => unimplemented!(),
+            Name::Merkle(_m) => unimplemented!(),
             Name::TaggedTuple(n, ns) => {
                 write!(f, "{}", n)?;
                 if ns.len() > 0 {
