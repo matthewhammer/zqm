@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
-use types::lang::{Dir1D, Name};
+use types::lang::{Atom, Dir1D, Name};
 
 pub type Text = String;
 pub type Nat = usize; // todo -- use a bignum rep
@@ -146,7 +146,7 @@ pub mod semantics {
     pub type Res = Result<(), Err>;
 
     pub fn editor_eval(menu: &mut Editor, command: &Command) -> Res {
-        info!("editor_eval({:?}) begin", command);
+        trace!("editor_eval({:?}) begin", command);
         let res = match command {
             Command::Init(InitCommand::Default(ref default_choice, ref typ)) => {
                 menu.state = Some(MenuState {
@@ -163,7 +163,7 @@ pub mod semantics {
             },
             Command::Auto(ref c) => unimplemented!(),
         };
-        info!("editor_eval({:?}) ==> {:?}", command, res);
+        debug!("editor_eval({:?}) ==> {:?}", command, res);
         menu.history.push(command.clone());
         res
     }
@@ -607,7 +607,7 @@ pub mod semantics {
 
 pub mod io {
     use super::{
-        semantics::{ctx_tag, tree_tag},
+        semantics::{ctx_tag, tree_tag, typ_tag},
         EditCommand, Label, MenuCtx, MenuState, MenuTree, Tag,
     };
     use render::Render;
@@ -701,7 +701,7 @@ pub mod io {
             }
         };
 
-        // eventually we get these atts from
+        // eventaually we get these atts from
         //  some environment-determined settings
         fn glyph_flow() -> FlowAtts {
             FlowAtts {
@@ -727,11 +727,34 @@ pub mod io {
         };
         fn msg_atts() -> TextAtts {
             TextAtts {
-                zoom: (text_zoom() / 2).min(1),
+                zoom: (text_zoom() / 2).max(1),
                 fg_fill: Fill::Closed(Color::RGB(200, 200, 255)),
                 bg_fill: Fill::None,
                 glyph_dim: glyph_dim(),
                 glyph_flow: glyph_flow(),
+            }
+        };
+        fn typ_atts() -> TextAtts {
+            TextAtts {
+                zoom: 1,
+                fg_fill: Fill::Closed(Color::RGB(200, 255, 255)),
+                bg_fill: Fill::None,
+                glyph_dim: glyph_dim(),
+                glyph_flow: glyph_flow(),
+            }
+        };
+        fn typ_vflow() -> FlowAtts {
+            FlowAtts {
+                dir: Dir2D::Down,
+                intra_pad: 1,
+                inter_pad: 1,
+            }
+        };
+        fn typ_hflow() -> FlowAtts {
+            FlowAtts {
+                dir: Dir2D::Right,
+                intra_pad: 1,
+                inter_pad: 1,
             }
         };
         fn text_atts() -> TextAtts {
@@ -798,6 +821,10 @@ pub mod io {
             r.begin(&Name::Void, FrameType::Flow(horz_flow()))
         }
 
+        fn begin_flow(r: &mut Render, f: &FlowAtts) {
+            r.begin(&Name::Void, FrameType::Flow(f.clone()))
+        }
+
         fn render_ctx(ctx: &MenuCtx, show_detailed: bool, r_out: &mut Render, r_tree: Render) {
             let mut next_ctx = None;
             let mut r = Render::new();
@@ -810,7 +837,6 @@ pub mod io {
                     drop(r);
                     r_out.begin(&Name::Void, FrameType::Flow(vert_flow()));
                     r_out.nest(&Name::Void, r_tree);
-                    r_out.text(&format!("...of type {:?}", t), &msg_atts());
                     r_out.end();
                     return;
                 }
@@ -857,6 +883,73 @@ pub mod io {
             };
         };
 
+        use super::{MenuType, PrimType};
+
+        fn render_type(
+            typ: &MenuType,
+            text: &TextAtts,
+            vflow: &FlowAtts,
+            hflow: &FlowAtts,
+            r: &mut Render,
+        ) {
+            let mut first = true;
+            match typ {
+                MenuType::Prim(PrimType::Unit) => r.str("()", text),
+                MenuType::Prim(PrimType::Nat) => r.str("nat", text),
+                MenuType::Prim(PrimType::Text) => r.str("text", text),
+                MenuType::Prim(PrimType::Bool) => r.str("bool", text),
+                MenuType::Variant(fields) => {
+                    begin_flow(r, vflow);
+                    if fields.len() > 0 {
+                        for (l, t) in fields.iter() {
+                            if first {
+                                first = false;
+                                begin_flow(r, hflow);
+                                r.str("{", text);
+                            } else {
+                                r.end();
+                                begin_flow(r, hflow);
+                                r.str("; ", text);
+                            };
+                            r.str(&format!("#{}: ", l), text);
+                            render_type(t, text, vflow, hflow, r);
+                        }
+                        r.str("}", text);
+                        r.end();
+                    } else {
+                        unimplemented!()
+                    }
+                    r.end()
+                }
+                MenuType::Product(fields) => {
+                    begin_flow(r, vflow);
+                    if fields.len() > 0 {
+                        for (l, t) in fields.iter() {
+                            if first {
+                                first = false;
+                                begin_flow(r, hflow);
+                                r.str("{", text);
+                            } else {
+                                r.end();
+                                begin_flow(r, hflow);
+                                r.str("; ", text);
+                            };
+                            r.str(&format!("{}: ", l), text);
+                            render_type(t, text, vflow, hflow, r);
+                        }
+                        r.str("}", text);
+                        r.end();
+                    } else {
+                        unimplemented!()
+                    }
+                    r.end()
+                }
+                MenuType::Option(t) => unimplemented!(),
+                MenuType::Vec(t) => unimplemented!(),
+                MenuType::Tup(fields) => unimplemented!(),
+            }
+        }
+
         fn render_tree(tree: &MenuTree, show_detailed: bool, box_fill: &Fill, r: &mut Render) {
             r.begin(&Name::Void, FrameType::Flow(horz_flow()));
             r.fill(box_fill.clone());
@@ -875,7 +968,15 @@ pub mod io {
                 &MenuTree::Variant(ref ch) => {
                     r.begin(&Name::Void, FrameType::Flow(vert_flow()));
                     if show_detailed {
+                        begin_item(r);
                         r.text(&format!("Choice:"), &msg_atts());
+                        if let Some((ref l, ref tree, ref _tree_t)) = ch.choice {
+                            // nothing
+                        } else {
+                            r.text(&format!("___"), &blank_atts());
+                            r.text(&format!(" Please, choose one below (Up/Down)"), &msg_atts());
+                        }
+                        r.end();
                         r.begin(&Name::Void, FrameType::Flow(vert_flow()));
                         r.fill(choice_box_fill());
                         for (l, t, ty) in ch.before.iter() {
@@ -890,11 +991,16 @@ pub mod io {
                             render_tree(&tree, false, box_fill, r);
                             r.end();
                         } else {
-                            begin_item(r);
-                            r.text(&format!(">"), &cursor_atts());
-                            r.text(&format!("___"), &blank_atts());
-                            r.text(&format!(" Please, choose one below (Up/Down)"), &msg_atts());
-                            r.end();
+                            if false {
+                                begin_item(r);
+                                r.text(&format!(">"), &cursor_atts());
+                                r.text(&format!("___"), &blank_atts());
+                                r.text(
+                                    &format!(" Please, choose one below (Up/Down)"),
+                                    &msg_atts(),
+                                );
+                                r.end();
+                            }
                         };
                         for (l, t, ty) in ch.after.iter() {
                             begin_item(r);
@@ -935,7 +1041,6 @@ pub mod io {
                     }
                     r.end();
                 }
-                //&MenuTree::Blank(ref typ) => r.text(&format!("__{:?}__", typ), &blank_atts()),
                 &MenuTree::Blank(ref typ) => r.text(&format!("___"), &blank_atts()),
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
                 &MenuTree::Bool(b) => r.text(&format!("{}", b), &text_atts()),
@@ -949,16 +1054,20 @@ pub mod io {
         if true {
             r.str("hello world!", &text_atts());
             r.str(" please, enter a value to submit:", &msg_atts());
-            r.str(
-                " (keys: Tab, Right, Down, Up, Left, Enter, Esc)",
-                &msg_atts(),
-            );
+            r.str(" (Auto-fill and navigate with arrow keys)", &msg_atts());
 
-            let mut r_tree = {
+            let r_tree = {
                 let mut r_tree = Render::new();
                 r_tree.begin(&Name::Void, FrameType::Flow(vert_flow()));
                 r_tree.fill(active_cursor_fill());
                 render_tree(&menu.tree, true, &detailed_tree_box_fill(), &mut r_tree);
+                render_type(
+                    &menu.tree_typ,
+                    &typ_atts(),
+                    &typ_vflow(),
+                    &typ_hflow(),
+                    &mut r_tree,
+                );
                 r_tree.end();
                 r_tree
             };
@@ -966,5 +1075,80 @@ pub mod io {
         }
         r.end();
         Ok(r.into_elms())
+    }
+}
+
+use std::fmt;
+
+// move elsewhere
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut first = true;
+        match self {
+            Name::Void => write!(f, "<void>"),
+            Name::Atom(Atom::Bool(b)) => write!(f, "{}", b),
+            Name::Atom(Atom::Usize(u)) => write!(f, "{}", u),
+            Name::Atom(Atom::String(s)) => write!(f, "{}", s),
+            Name::Merkle(m) => unimplemented!(),
+            Name::TaggedTuple(n, ns) => {
+                write!(f, "{}", n)?;
+                if ns.len() > 0 {
+                    write!(f, "(")?;
+                    for n in ns.iter() {
+                        write!(f, "{}", n)?;
+                    }
+                    write!(f, ")")
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for MenuType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut first = true;
+        match self {
+            MenuType::Prim(PrimType::Unit) => write!(f, "()"),
+            MenuType::Prim(PrimType::Nat) => write!(f, "nat"),
+            MenuType::Prim(PrimType::Text) => write!(f, "text"),
+            MenuType::Prim(PrimType::Bool) => write!(f, "bool"),
+            MenuType::Variant(fields) => {
+                write!(f, "{{")?;
+                for (l, t) in fields.iter() {
+                    if !first {
+                        write!(f, "; ")?;
+                    };
+                    write!(f, "#{}: {}", l, t)?;
+                    first = false;
+                }
+                write!(f, "}}")
+            }
+            MenuType::Product(fields) => {
+                write!(f, "{{")?;
+                for (l, t) in fields.iter() {
+                    if !first {
+                        write!(f, "; ")?;
+                    };
+                    write!(f, "{}: {}", l, t)?;
+                    first = false;
+                }
+                write!(f, "}}")
+            }
+            MenuType::Option(t) => write!(f, "?{}", t),
+            MenuType::Vec(t) => write!(f, "[{}]", t),
+            MenuType::Tup(fields) => {
+                write!(f, "(")?;
+                for t in fields.iter() {
+                    if !first {
+                        write!(f, ", ")?;
+                    };
+                    write!(f, "{}", t)?;
+                    first = false;
+                }
+                write!(f, ")")
+            }
+        }
     }
 }
