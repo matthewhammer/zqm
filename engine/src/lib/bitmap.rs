@@ -156,18 +156,18 @@ pub mod semantics {
 
     pub fn bitmap_set_bit(bitmap: &mut Bitmap, x: usize, y: usize, b: bool) {
         match bitmap.major {
-            Major::Row => bitmap.bits[x][y] = b,
-            Major::Col => bitmap.bits[y][x] = b,
+            Major::Row => bitmap.bits[y][x] = b,
+            Major::Col => bitmap.bits[x][y] = b,
         };
         debug!("bitmap_set_bit({}, {}, {})", x, y, b);
     }
 
     pub fn bitmap_get_bit(bitmap: &Bitmap, x: usize, y: usize) -> bool {
         let b = match bitmap.major {
-            Major::Row => bitmap.bits[x][y],
-            Major::Col => bitmap.bits[y][x],
+            Major::Row => bitmap.bits[y][x],
+            Major::Col => bitmap.bits[x][y],
         };
-        trace!("bitmap_get_bit({}, {}) = {}", x, y, b);
+        debug!("bitmap_get_bit({}, {}) ==> {}", x, y, b);
         b
     }
 
@@ -178,7 +178,7 @@ pub mod semantics {
     pub fn bitmap_toggle_bit(bitmap: &mut Bitmap, x: usize, y: usize) -> bool {
         let b = bitmap_get_bit(bitmap, x, y);
         bitmap_set_bit(bitmap, x, y, !b);
-        debug!("bitmap_toggle_bit({}, {}) = {}", x, y, !b);
+        debug!("bitmap_toggle_bit({}, {}) ==> {}", x, y, !b);
         !b
     }
 
@@ -274,49 +274,34 @@ pub mod semantics {
 // Step 6:
 // -------
 //
-// Define the IO for the Editor.  We use SDL for system-level IO on Mac/Linux.
-
-// To do: We are going to use our own `render` elements (types::render::Elms) soon.
+// Define the IO for the Editor using the abstract `render` module, and associated types.
 
 pub mod io {
     use super::{Dir2D, EditCommand, EditorState};
     use types::event::Event;
-    use types::render::{self, Color, Rect, Elm, Elms, Fill};
+    use types::render::{self, Color, Fill, Rect};
 
     pub fn edit_commands_of_event(event: &Event) -> Result<Vec<EditCommand>, ()> {
         match event {
             &Event::Quit { .. } => Err(()),
-            &Event::KeyDown(ref kei) => {
-                match kei.key.as_str() {
-                    "Escape"     => Err(()),
-                    " " => Ok(vec![EditCommand::Toggle]),
-                    "ArrowLeft"  => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
-                    "ArrowRight" => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
-                    "ArrowUp"    => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
-                    "ArrowDown"  => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
-                    _ => Ok(vec![]),
-                }
+            &Event::KeyDown(ref kei) => match kei.key.as_str() {
+                "Escape" => Err(()),
+                " " => Ok(vec![EditCommand::Toggle]),
+                "ArrowLeft" => Ok(vec![EditCommand::MoveRel(Dir2D::Left)]),
+                "ArrowRight" => Ok(vec![EditCommand::MoveRel(Dir2D::Right)]),
+                "ArrowUp" => Ok(vec![EditCommand::MoveRel(Dir2D::Up)]),
+                "ArrowDown" => Ok(vec![EditCommand::MoveRel(Dir2D::Down)]),
+                _ => Ok(vec![]),
             },
             _ => Ok(vec![]),
         }
     }
 
-    struct Out {
-        pub elms:Elms
-    }
-    impl Out {
-        pub fn new() -> Out {
-            Out{ elms: vec![] }
-        }
-        pub fn add_rect(&mut self, r:&Rect, f:Fill) {
-            self.elms.push(Elm::Rect(r.clone(), f))
-        }
-    }
-
     //use sdl2::render::{Canvas, RenderTarget};
     pub fn render_elms(edit_state: &EditorState) -> Result<render::Elms, String> {
+        use render::Render;
 
-        let mut out: Out = Out::new();
+        let mut render: Render = Render::new();
 
         let (width, height) = super::semantics::bitmap_get_size(&edit_state.bitmap);
 
@@ -344,38 +329,33 @@ pub mod io {
         };
 
         let cursor_rect = Rect::new(
-            edit_state.cursor.0 * cell_width,
-            edit_state.cursor.1 * cell_width,
+            (edit_state.cursor.0 * cell_width) as isize,
+            (edit_state.cursor.1 * cell_width) as isize,
             cell_width,
-            cell_width
+            cell_width,
         );
 
         // grid border is a single background rect:
-        let grid_rect = Rect::new(
-            0,
-            0,
-            width * cell_width,
-            height * cell_width,
-        );
-        out.add_rect(&grid_rect, Fill::Closed(grid_border_color.clone()));
-        out.add_rect(&cursor_rect, Fill::Closed(cursor_border_color.clone()));
+        let grid_rect = Rect::new(0, 0, width * cell_width, height * cell_width);
+        render.rect(&grid_rect, Fill::Closed(grid_border_color.clone()));
+        render.rect(&cursor_rect, Fill::Closed(cursor_border_color.clone()));
 
         // grid cells are rects:
         for x in 0..width {
             for y in 0..height {
                 let cell_rect = Rect::new(
-                    x * cell_width + border_width,
-                    y * cell_width + border_width,
+                    (x * cell_width + border_width) as isize,
+                    (y * cell_width + border_width) as isize,
                     zoom,
                     zoom,
                 );
                 let bit =
                     super::semantics::bitmap_get_bit(&edit_state.bitmap, x as usize, y as usize);
                 let cell_color = get_cell_color(bit, (x as usize, y as usize) == edit_state.cursor);
-                out.add_rect(&cell_rect, Fill::Closed(cell_color.clone()));
-                out.add_rect(&cell_rect, Fill::Open(grid_border_color.clone(), 1));
+                render.rect(&cell_rect, Fill::Closed(cell_color.clone()));
+                render.rect(&cell_rect, Fill::Open(grid_border_color.clone(), 1));
             }
         }
-        Ok(out.elms)
+        Ok(render.into_elms())
     }
 }

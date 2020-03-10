@@ -1,6 +1,6 @@
 use types::adapton::{
-    Action, Closure, Context, Edge, LogEvent, LogEventTag, LogEvents, Node, NodeId, Ref,
-    Stack, Store, Thunk,
+    Action, Closure, Context, Edge, LogEvent, LogEventTag, LogEvents, Node, NodeId, Ref, Stack,
+    Store, Thunk,
 };
 use types::lang::{Media, Name, Result as EvalResult};
 
@@ -15,47 +15,47 @@ mod algo {
     type Edges = Vec<Edge>;
 
     #[allow(unused_variables, unused_mut)]
-    pub fn dirty_ref(ctx: &mut Context, name:&Name, ref_node:&RefNode) {
+    pub fn dirty_ref(ctx: &mut Context, name: &Name, ref_node: &RefNode) {
         unimplemented!()
     }
 
     #[allow(unused_variables, unused_mut)]
-    pub fn dirty_thunk(ctx: &mut Context, name:&Name, thunk_node:&ThunkNode) {
+    pub fn dirty_thunk(ctx: &mut Context, name: &Name, thunk_node: &ThunkNode) {
         unimplemented!()
     }
 
     #[allow(unused_variables, unused_mut)]
-    pub fn thunk_is_dirty(t:&ThunkNode) -> bool {
+    pub fn thunk_is_dirty(t: &ThunkNode) -> bool {
         unimplemented!()
     }
 
     #[allow(unused_variables, unused_mut)]
-    pub fn add_edge(ctx: &mut Context, target: &NodeId, action:&Action) {
+    pub fn add_edge(ctx: &mut Context, target: &NodeId, action: &Action) {
         unimplemented!()
     }
 
     #[allow(unused_variables, unused_mut)]
-    pub fn add_back_edges(ctx: &mut Context, edges:&Edges) {
+    pub fn add_back_edges(ctx: &mut Context, edges: &Edges) {
         unimplemented!()
     }
 
     #[allow(unused_variables, unused_mut)]
-    pub fn rem_back_edges(ctx: &mut Context, edges:&Edges) {
+    pub fn rem_back_edges(ctx: &mut Context, edges: &Edges) {
         unimplemented!()
     }
 
     #[allow(unused_variables, unused_mut)]
-    pub fn add_back_edge(ctx: &mut Context, edge:&Edge) {
+    pub fn add_back_edge(ctx: &mut Context, edge: &Edge) {
         unimplemented!()
     }
 
     #[allow(unused_variables, unused_mut)]
-    pub fn rem_back_edge(ctx: &mut Context, edge:&Edge) {
+    pub fn rem_back_edge(ctx: &mut Context, edge: &Edge) {
         unimplemented!()
     }
 
     #[allow(unused_variables, unused_mut)]
-    pub fn clean_edge(ctx:&mut Context, edge:&Edge) -> bool {
+    pub fn clean_edge(ctx: &mut Context, edge: &Edge) -> bool {
         unimplemented!()
     }
 
@@ -98,8 +98,6 @@ pub fn leave_scope(ctx: &mut Context) {
     unimplemented!()
 }
 
-
-
 pub enum PutError {}
 
 pub enum GetError {}
@@ -124,8 +122,6 @@ impl Stack {
         self.0.pop()
     }
 }
-
-
 
 fn begin_log_event(ctx: &mut Context) {
     let mut buf_buf = vec![];

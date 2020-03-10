@@ -1,6 +1,6 @@
 /// The ZQM language: abstract syntax
 pub mod lang {
-    use crate::{bitmap, chain, grid};
+    use crate::{bitmap, chain, grid, menu};
     use hashcons::merkle::Merkle;
     use serde::{Deserialize, Serialize};
 
@@ -25,10 +25,10 @@ pub mod lang {
     }
 
     /*
-    Possible idea: 
+    Possible idea:
     Introduce LISP-like quotes in a type-theoretic way,
     a la a dual-context, modal interpretation of quoting;
-    see Georgios Alexandros Kavvos's arxiv paper on 
+    see Georgios Alexandros Kavvos's arxiv paper on
     "intensionality and intensional recursion, and the Godel-Lob axiom", 2017.
     */
 
@@ -103,6 +103,7 @@ pub mod lang {
     #[derive(Debug, Serialize, Deserialize, Hash)]
     pub enum Editor {
         Bitmap(Box<bitmap::Editor>),
+        Menu(Box<menu::Editor>),
         Chain(Box<chain::Editor>),
         Grid(Box<grid::Editor>),
     }
@@ -111,6 +112,7 @@ pub mod lang {
     // for expressing scripts, etc; then we'd need to do substitution, or more env-passing, or both.
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub enum Command {
+        Menu(menu::Command),
         Bitmap(bitmap::Command),
         Chain(chain::Command),
         Grid(grid::Command),
@@ -142,8 +144,8 @@ pub mod lang {
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum Name {
+        Void,
         Atom(Atom),
-        Option(Option<Box<Name>>),
         TaggedTuple(Box<Name>, Vec<Name>),
         Merkle(Merkle<Name>),
     }
@@ -245,9 +247,9 @@ pub mod adapton {
         Editor,
     }
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-    pub struct Store ( pub Vec<(Name, Node)> );
+    pub struct Store(pub Vec<(Name, Node)>);
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-    pub struct Stack ( pub Vec<Name> );
+    pub struct Stack(pub Vec<Name>);
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub struct Context {
         pub agent: Agent,
@@ -271,11 +273,7 @@ pub mod adapton {
         ) -> Result<NodeId, adapton::PutError> {
             adapton::put_thunk(self, name, closure)
         }
-        pub fn put(
-            &mut self,
-            name: Name,
-            media: Media,
-        ) -> Result<NodeId, adapton::PutError> {
+        pub fn put(&mut self, name: Name, media: Media) -> Result<NodeId, adapton::PutError> {
             adapton::put(self, name, media)
         }
         pub fn get(&mut self, name: Name, node: NodeId) -> Result<EvalResult, adapton::GetError> {
@@ -329,6 +327,7 @@ pub mod event {
 
 /// system output
 pub mod render {
+    use super::lang::Name;
     use serde::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -342,8 +341,8 @@ pub mod render {
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Pos {
-        pub x: usize,
-        pub y: usize,
+        pub x: isize,
+        pub y: isize,
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Rect {
@@ -351,12 +350,19 @@ pub mod render {
         pub dim: Dim,
     }
     impl Rect {
-        pub fn new (x:usize, y:usize, w:usize, h:usize) -> Rect {
-            Rect{ pos: Pos{x, y}, dim: Dim{ width:w, height:h } }
+        pub fn new(x: isize, y: isize, w: usize, h: usize) -> Rect {
+            Rect {
+                pos: Pos { x, y },
+                dim: Dim {
+                    width: w,
+                    height: h,
+                },
+            }
         }
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Node {
+        pub name: Name,
         pub rect: Rect,
         pub fill: Fill,
         pub children: Elms,
