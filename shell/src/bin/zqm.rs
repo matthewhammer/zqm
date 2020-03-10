@@ -122,7 +122,7 @@ pub fn draw_elms<T: RenderTarget>(
                 canvas.set_draw_color(c);
                 canvas.draw_rect(r).unwrap();
             }
-            Fill::Open(c, _) => unimplemented!(),
+            Fill::Open(_c, _) => unimplemented!(),
         }
     };
     use zqm_engine::types::render::{Elm, Fill};
@@ -174,6 +174,7 @@ fn translate_system_event(event: SysEvent) -> Option<event::Event> {
                 Keycode::Right => "ArrowRight".to_string(),
                 Keycode::Up => "ArrowUp".to_string(),
                 Keycode::Down => "ArrowDown".to_string(),
+                Keycode::Backspace => "Backspace".to_string(),
                 keycode => format!("unrecognized({:?})", keycode),
             };
             let event = event::Event::KeyDown(event::KeyEventInfo {
@@ -195,8 +196,8 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
 
     let pos = render::Pos { x: 0, y: 0 };
     let dim = render::Dim {
-        width: 640,
-        height: 480,
+        width: 888,
+        height: 666,
     };
     let fill = render::Fill::Closed(render::Color::RGB(0, 0, 0));
 

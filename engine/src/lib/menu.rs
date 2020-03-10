@@ -97,6 +97,7 @@ pub enum EditCommand {
     NextSibling,
     GotoRoot,       // ---?
     AutoFill,       // Tab
+    Clear,          // Backspace
     NextTree,       // ArrowRight
     PrevTree,       // ArrowLeft
     NextBlank,      // ---?
@@ -175,6 +176,10 @@ pub mod semantics {
                 let tree = auto_fill(&menu.tree_typ, 1);
                 drop(tree_union(&menu.tree, &tree));
                 menu.tree = tree;
+                Ok(())
+            }
+            &EditCommand::Clear => {
+                menu.tree = MenuTree::Blank(menu.tree_typ.clone());
                 Ok(())
             }
             &EditCommand::NextTree => next_tree(menu).map(|_| ()),
@@ -618,6 +623,7 @@ pub mod io {
             (&Event::Quit { .. }, _, _) => Err(()),
             (&Event::KeyDown(ref kei), ref ctx, ref tree) => match (kei.key.as_str(), ctx, tree) {
                 ("Escape", _, _) => Err(()),
+                ("Backspace", _, _) => Ok(vec![EditCommand::Clear]),
 
                 ("Tab", _, Tag::Blank) => Ok(vec![EditCommand::AutoFill]),
                 ("ArrowRight", _, Tag::Blank) => Ok(vec![EditCommand::AutoFill]),
@@ -677,7 +683,7 @@ pub mod io {
         }
 
         fn text_zoom() -> usize {
-            2
+            3
         }
         fn glyph_padding() -> usize {
             1
@@ -723,7 +729,7 @@ pub mod io {
         };
         fn msg_atts() -> TextAtts {
             TextAtts {
-                zoom: (text_zoom() / 2).max(1),
+                zoom: 2,
                 fg_fill: Fill::Closed(Color::RGB(200, 200, 255)),
                 bg_fill: Fill::None,
                 glyph_dim: glyph_dim(),
@@ -732,7 +738,7 @@ pub mod io {
         };
         fn typ_atts() -> TextAtts {
             TextAtts {
-                zoom: 1,
+                zoom: 2,
                 fg_fill: Fill::Closed(Color::RGB(200, 255, 255)),
                 bg_fill: Fill::None,
                 glyph_dim: glyph_dim(),
