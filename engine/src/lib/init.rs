@@ -1,6 +1,6 @@
 use eval;
 use menu;
-use types::lang::{Atom, Command, Editor, Name, State};
+use types::lang::{Atom, Command, Editor, Frame, FrameCont, Name, State};
 
 pub fn init_state() -> State {
     let (mut state_init, init_command) = {
@@ -8,10 +8,18 @@ pub fn init_state() -> State {
             use crate::bitmap;
             (
                 State {
-                    editor: Editor::Bitmap(Box::new(bitmap::Editor {
-                        state: None,
-                        history: vec![],
-                    })),
+                    stack: vec![],
+                    frame: Frame {
+                        name: Name::Void,
+                        editor: Editor::Bitmap(Box::new(bitmap::Editor {
+                            state: None,
+                            history: vec![],
+                        })),
+                        cont: FrameCont {
+                            var: Name::Void,
+                            commands: vec![],
+                        },
+                    },
                 },
                 Command::Bitmap(bitmap::Command::Init(bitmap::InitCommand::Make16x16)),
             )
@@ -79,10 +87,11 @@ pub fn init_state() -> State {
             ]);
             (
                 State {
-                    editor: Editor::Menu(Box::new(menu::Editor {
+                    stack: vec![],
+                    frame: Frame::from_editor(Editor::Menu(Box::new(menu::Editor {
                         state: None,
                         history: vec![],
-                    })),
+                    }))),
                 },
                 Command::Menu(menu::Command::Init(menu::InitCommand::Default(
                     menu::MenuTree::Blank(root.clone()),

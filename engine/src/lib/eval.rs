@@ -11,7 +11,7 @@ pub use super::types::{
 
 pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command>, ()> {
     debug!("commands_of_event {:?}", event);
-    let res = match &mut state.editor {
+    let res = match &mut state.frame.editor {
         &mut Editor::Bitmap(ref _ed) => {
             // to do -- insert a name into each command that is unique,
             // but whose structure encodes a wallclock timestamp, among other sequence numbers.
@@ -47,7 +47,7 @@ pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command
 
 pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> {
     debug!("command_eval {:?}", command);
-    let res = match (command, &mut state.editor) {
+    let res = match (command, &mut state.frame.editor) {
         (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
             super::bitmap::semantics::editor_eval(be, bc)
         }
@@ -70,7 +70,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
 }
 
 pub fn render_elms(state: &State) -> Result<render::Elms, String> {
-    match &state.editor {
+    match &state.frame.editor {
         &Editor::Bitmap(ref ed) => match ed.state {
             None => Ok(vec![]),
             Some(ref ed) => super::bitmap::io::render_elms(ed),

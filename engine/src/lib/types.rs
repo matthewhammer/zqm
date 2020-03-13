@@ -108,6 +108,19 @@ pub mod lang {
         Grid(Box<grid::Editor>),
     }
 
+    #[derive(Debug, Serialize, Deserialize, Hash)]
+    pub struct Frame {
+        pub name: Name,
+        pub editor: Editor,
+        pub cont: FrameCont,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, Hash)]
+    pub struct FrameCont {
+        pub var: Name,
+        pub commands: Vec<Command>,
+    }
+
     // to do -- eventually, we may want these to be "open" wrt the exp environment;
     // for expressing scripts, etc; then we'd need to do substitution, or more env-passing, or both.
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
@@ -134,7 +147,8 @@ pub mod lang {
 
     #[derive(Debug, Serialize, Deserialize, Hash)]
     pub struct State {
-        pub editor: Editor,
+        pub stack: Vec<Frame>,
+        pub frame: Frame,
     }
 
     pub type Hash = u64;
@@ -162,6 +176,19 @@ pub mod lang {
     pub struct Location {
         pub time: Name,
         pub place: Name,
+    }
+
+    impl Frame {
+        pub fn from_editor(editor: Editor) -> Frame {
+            Frame {
+                name: Name::Void,
+                editor: editor,
+                cont: FrameCont {
+                    var: Name::Void,
+                    commands: vec![],
+                },
+            }
+        }
     }
 }
 
