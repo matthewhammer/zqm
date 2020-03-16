@@ -9,8 +9,6 @@ extern crate serde_bytes;
 
 extern crate serde_idl;
 
-// -------- eval semantics ---------
-
 pub mod eval;
 pub mod init;
 pub mod types;

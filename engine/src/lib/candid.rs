@@ -13,7 +13,7 @@ fn parse_idl(input: &str) -> IDLProg {
     IDLProgParser::new().parse(lexer).unwrap()
 }
 
-fn name_of_idllabel(l:&Label) -> Name {
+fn name_of_idllabel(l: &Label) -> Name {
     match l {
         Label::Id(n) => Name::Atom(Atom::Usize(*n as usize)),
         Label::Named(n) => Name::Atom(Atom::String(n.clone())),
@@ -21,7 +21,7 @@ fn name_of_idllabel(l:&Label) -> Name {
     }
 }
 
-fn menutype_of_idltype(t:&IDLType) -> MenuType {
+fn menutype_of_idltype(t: &IDLType) -> MenuType {
     match t {
         IDLType::RecordT(fields) => {
             let mut out = vec![];
@@ -41,49 +41,38 @@ fn menutype_of_idltype(t:&IDLType) -> MenuType {
             }
             MenuType::Variant(out)
         }
-        IDLType::PrimT(Nat) => {
-            MenuType::Prim(menu::PrimType::Nat)
-        }
-        IDLType::PrimT(Text) => {
-            MenuType::Prim(menu::PrimType::Text)
-        }
-        IDLType::PrimT(Bool) => {
-            MenuType::Prim(menu::PrimType::Bool)
-        }
-        _ => {
-            unimplemented!("{:?}", t)
-        }
+        IDLType::PrimT(Nat) => MenuType::Prim(menu::PrimType::Nat),
+        IDLType::PrimT(Text) => MenuType::Prim(menu::PrimType::Text),
+        IDLType::PrimT(Bool) => MenuType::Prim(menu::PrimType::Bool),
+        _ => unimplemented!("{:?}", t),
     }
 }
 
-fn menutype_of_idlprog_service(p:&IDLProg) -> menu::MenuType {
+fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
     match p.actor {
         Some(IDLType::ServT(ref methods)) => {
             let mut choices = vec![];
             for method in methods.iter() {
                 //eprint!("method {:?} : {:?}", method.id, method.typ);
-                let i = method.id.clone();                
+                let i = method.id.clone();
                 let t = match method.typ {
-                    IDLType::FuncT(ref ft) => {                        
-                        let arg_types : Vec<MenuType> = 
+                    IDLType::FuncT(ref ft) => {
+                        let arg_types: Vec<MenuType> =
                             ft.args.iter().map(|a| menutype_of_idltype(a)).collect();
                         let mut fields = vec![];
                         for i in 0..arg_types.len() {
-                            fields.push((Name::Atom(Atom::Usize(fields.len())),
-                                        arg_types[i].clone()))
+                            fields
+                                .push((Name::Atom(Atom::Usize(fields.len())), arg_types[i].clone()))
                         }
                         MenuType::Product(fields)
                     }
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 };
-                choices.push((
-                    Name::Atom(Atom::String(i)), t));
+                choices.push((Name::Atom(Atom::String(i)), t));
             }
             MenuType::Variant(choices)
         }
-        _ => {
-            panic!("expected a service type")
-        }
+        _ => panic!("expected a service type"),
     }
 }
 
