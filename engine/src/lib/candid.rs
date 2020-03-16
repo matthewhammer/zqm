@@ -6,14 +6,17 @@ use types::lang::{Atom, Name};
 
 use serde_idl::grammar::IDLProgParser;
 use serde_idl::lexer::Lexer;
-use serde_idl::types::{to_pretty, IDLProg, IDLType, Label};
+use serde_idl::types::{to_pretty, Dec, IDLProg, IDLType, Label};
+
+use std::collections::HashMap;
+pub type Env = HashMap<String, MenuType>;
 
 pub fn parse_idl(input: &str) -> IDLProg {
     let lexer = Lexer::new(input);
     IDLProgParser::new().parse(lexer).unwrap()
 }
 
-pub fn name_of_idllabel(l: &Label) -> Name {
+fn name_of_idllabel(l: &Label) -> Name {
     match l {
         Label::Id(n) => Name::Atom(Atom::Usize(*n as usize)),
         Label::Named(n) => Name::Atom(Atom::String(n.clone())),
@@ -21,7 +24,7 @@ pub fn name_of_idllabel(l: &Label) -> Name {
     }
 }
 
-pub fn menutype_of_idltype(t: &IDLType) -> MenuType {
+fn menutype_of_idltype(t: &IDLType) -> MenuType {
     match t {
         IDLType::RecordT(fields) => {
             let mut out = vec![];
@@ -41,6 +44,15 @@ pub fn menutype_of_idltype(t: &IDLType) -> MenuType {
             }
             MenuType::Variant(out)
         }
+        IDLType::OptT(t) => {
+            let mt = menutype_of_idltype(t);
+            MenuType::Option(Box::new(mt))
+        }
+        IDLType::VarT(v) => MenuType::Var(Name::Atom(Atom::String(v.clone()))),
+        IDLType::VecT(t) => {
+            let t = menutype_of_idltype(&*t);
+            MenuType::Vec(Box::new(t))
+        }
         IDLType::PrimT(Nat) => MenuType::Prim(menu::PrimType::Nat),
         IDLType::PrimT(Text) => MenuType::Prim(menu::PrimType::Text),
         IDLType::PrimT(Bool) => MenuType::Prim(menu::PrimType::Bool),
@@ -49,6 +61,17 @@ pub fn menutype_of_idltype(t: &IDLType) -> MenuType {
 }
 
 pub fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
+    let mut env = HashMap::new();
+    for dec in p.decs.iter() {
+        match dec {
+            Dec::TypD(ref b) => {
+                let t = menutype_of_idltype(&b.typ);
+                //print!("{:?}", b);
+                drop(env.insert(b.id.clone(), t))
+            }
+            _ => unimplemented!(),
+        }
+    }
     match p.actor {
         Some(IDLType::ServT(ref methods)) => {
             let mut choices = vec![];
@@ -74,6 +97,25 @@ pub fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
         }
         _ => panic!("expected a service type"),
     }
+}
+
+use types::lang::{Command, Editor, Frame, State};
+pub fn init_of_idlprog_ast(p: &IDLProg) -> Result<State, String> {
+    use eval;
+    let mt: menu::MenuType = menutype_of_idlprog_service(p);
+    let mut st = State {
+        stack: vec![],
+        frame: Frame::from_editor(Editor::Menu(Box::new(menu::Editor {
+            state: None,
+            history: vec![],
+        }))),
+    };
+    let cmd = Command::Menu(menu::Command::Init(menu::InitCommand::Default(
+        menu::MenuTree::Blank(mt.clone()),
+        mt,
+    )));
+    eval::command_eval(&mut st, &cmd)?;
+    Ok(st)
 }
 
 #[test]

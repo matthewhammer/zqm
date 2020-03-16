@@ -3,6 +3,11 @@
 use bitmap;
 use menu;
 
+pub enum LoadState {
+    CandidFile { file: String },
+    Resume,
+}
+
 pub use super::types::{
     event::Event,
     lang::{Command, Editor, State},

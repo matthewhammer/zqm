@@ -21,7 +21,7 @@ use std::io;
 // ZQM:
 extern crate zqm_engine;
 use zqm_engine::{
-    eval,
+    candid, eval, init,
     types::{self, event, render},
 };
 
@@ -44,20 +44,14 @@ struct CliOpt {
 
 #[derive(StructOpt, Debug)]
 enum CliCommand {
+    #[structopt(name = "candid", about = "Start an interactive Candid session.")]
+    Candid { file: String },
+
     #[structopt(name = "start", about = "Start interactively.")]
     Start,
 
     #[structopt(name = "resume", about = "Resume last interaction.")]
     Resume,
-
-    #[structopt(name = "replay", about = "Replay last interaction.")]
-    Replay,
-
-    #[structopt(
-        name = "history",
-        about = "Interact with history, the list of all prior interactions."
-    )]
-    History,
 
     #[structopt(name = "version", about = "Display version.")]
     Version,
@@ -276,12 +270,28 @@ fn main() {
             (_, _, _) => log::LevelFilter::Info,
         },
     );
-
-    let mut state = eval::load_state();
-
     info!("Evaluating CLI command: {:?} ...", &cliopt.command);
-
+    // - - - - - - - - - - -
     match cliopt.command {
+        CliCommand::Candid { file } => {
+            use std::fs;
+            let contents = fs::read_to_string(&file).expect("reading candid file");
+            let ast = candid::parse_idl(&contents);
+            //let menu = candid::menutype_of_idlprog_service(&ast);
+            let mut state = candid::init_of_idlprog_ast(&ast).unwrap();
+            do_event_loop(&mut state).unwrap();
+            eval::save_state(&state);
+        }
+        CliCommand::Start => {
+            let mut state = init::init_state();
+            do_event_loop(&mut state).unwrap();
+            eval::save_state(&state);
+        }
+        CliCommand::Resume => {
+            let mut state = eval::load_state();
+            do_event_loop(&mut state).unwrap();
+            eval::save_state(&state);
+        }
         CliCommand::Version => {
             const VERSION: &'static str = env!("CARGO_PKG_VERSION");
             println!("{}", VERSION);
@@ -292,15 +302,5 @@ fn main() {
             CliOpt::clap().gen_completions_to("zqm", s, &mut io::stdout());
             info!("done")
         }
-        CliCommand::Start => {
-            do_event_loop(&mut state).unwrap();
-            eval::save_state(&state);
-        }
-        CliCommand::Resume => {
-            do_event_loop(&mut state).unwrap();
-            eval::save_state(&state);
-        }
-        CliCommand::Replay => unimplemented!(),
-        CliCommand::History => unimplemented!(),
     }
 }
