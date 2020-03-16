@@ -8,12 +8,12 @@ use serde_idl::grammar::IDLProgParser;
 use serde_idl::lexer::Lexer;
 use serde_idl::types::{to_pretty, IDLProg, IDLType, Label};
 
-fn parse_idl(input: &str) -> IDLProg {
+pub fn parse_idl(input: &str) -> IDLProg {
     let lexer = Lexer::new(input);
     IDLProgParser::new().parse(lexer).unwrap()
 }
 
-fn name_of_idllabel(l: &Label) -> Name {
+pub fn name_of_idllabel(l: &Label) -> Name {
     match l {
         Label::Id(n) => Name::Atom(Atom::Usize(*n as usize)),
         Label::Named(n) => Name::Atom(Atom::String(n.clone())),
@@ -21,7 +21,7 @@ fn name_of_idllabel(l: &Label) -> Name {
     }
 }
 
-fn menutype_of_idltype(t: &IDLType) -> MenuType {
+pub fn menutype_of_idltype(t: &IDLType) -> MenuType {
     match t {
         IDLType::RecordT(fields) => {
             let mut out = vec![];
@@ -48,7 +48,7 @@ fn menutype_of_idltype(t: &IDLType) -> MenuType {
     }
 }
 
-fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
+pub fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
     match p.actor {
         Some(IDLType::ServT(ref methods)) => {
             let mut choices = vec![];
