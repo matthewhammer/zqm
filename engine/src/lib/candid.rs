@@ -53,6 +53,19 @@ fn menutype_of_idltype(env: &Env, t: &IDLType) -> MenuType {
             let t = menutype_of_idltype(env, &*t);
             MenuType::Vec(Box::new(t))
         }
+        IDLType::FuncT(ft) => {
+            let args = ft
+                .args
+                .iter()
+                .map(|t| menutype_of_idltype(env, t))
+                .collect();
+            let rets = ft
+                .rets
+                .iter()
+                .map(|t| menutype_of_idltype(env, t))
+                .collect();
+            MenuType::Func(menu::FuncType { args, rets })
+        }
         IDLType::PrimT(Nat) => MenuType::Prim(menu::PrimType::Nat),
         IDLType::PrimT(Text) => MenuType::Prim(menu::PrimType::Text),
         IDLType::PrimT(Bool) => MenuType::Prim(menu::PrimType::Bool),

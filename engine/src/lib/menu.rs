@@ -15,6 +15,7 @@ pub enum MenuType {
     Vec(Box<MenuType>),
     Tup(Vec<MenuType>),
     Var(Name),
+    Func(FuncType),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -23,6 +24,12 @@ pub enum PrimType {
     Nat,
     Text,
     Bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct FuncType {
+    pub args: Vec<MenuType>,
+    pub rets: Vec<MenuType>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -77,6 +84,7 @@ pub enum Tag {
     Tup,
     Blank,
     Var,
+    Func,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -250,6 +258,7 @@ pub mod semantics {
             MenuType::Tup(_) => Tag::Tup,
             MenuType::Vec(_) => Tag::Vec,
             MenuType::Var(_) => Tag::Var,
+            MenuType::Func(_) => Tag::Func,
         }
     }
 
@@ -569,6 +578,7 @@ pub mod semantics {
                 &MenuType::Prim(PrimType::Text) => MenuTree::Text("".to_string()),
                 &MenuType::Prim(PrimType::Bool) => MenuTree::Bool(false),
                 &MenuType::Var(ref n) => MenuTree::Blank(typ.clone()),
+                &MenuType::Func(ref f) => MenuTree::Blank(typ.clone()),
                 &MenuType::Variant(ref labtyps) => {
                     let after_choices: Vec<(Label, MenuTree, MenuType)> = labtyps
                         .iter()
@@ -981,6 +991,31 @@ pub mod io {
                     r.str(")", text);
                     r.end()
                 }
+                MenuType::Func(ft) => {
+                    begin_flow(r, hflow);
+                    r.str("(", text);
+                    let mut not_first = false;
+                    for t in ft.args.iter() {
+                        if not_first {
+                            r.str(", ", text);
+                        }
+                        render_type(t, text, vflow, hflow, r);
+                        not_first = true;
+                    }
+                    r.str(")", text);
+                    r.str("->", text);
+                    r.str("(", text);
+                    let mut not_first = false;
+                    for t in ft.rets.iter() {
+                        if not_first {
+                            r.str(", ", text);
+                        }
+                        render_type(t, text, vflow, hflow, r);
+                        not_first = true;
+                    }
+                    r.str(")", text);
+                    r.end()
+                }
             }
         }
 
@@ -1175,6 +1210,25 @@ impl fmt::Display for MenuType {
             MenuType::Tup(fields) => {
                 write!(f, "(")?;
                 for t in fields.iter() {
+                    if !first {
+                        write!(f, ", ")?;
+                    };
+                    write!(f, "{}", t)?;
+                    first = false;
+                }
+                write!(f, ")")
+            }
+            MenuType::Func(ft) => {
+                write!(f, "(")?;
+                for t in ft.args.iter() {
+                    if !first {
+                        write!(f, ", ")?;
+                    };
+                    write!(f, "{}", t)?;
+                    first = false;
+                }
+                write!(f, ") -> (");
+                for t in ft.rets.iter() {
                     if !first {
                         write!(f, ", ")?;
                     };
