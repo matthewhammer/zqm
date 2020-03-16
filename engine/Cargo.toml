@@ -15,6 +15,11 @@ serde_json = "1.0"
 hashcons = "0.1"
 #sdl2 = "0.32"
 
+serde-idl = { path = "/Users/matthew/dfn/sdk/src/serde_idl" }
+dfx_derive = { path = "/Users/matthew/dfn/sdk/src/dfx_derive" }
+dfx_info = { path = "/Users/matthew/dfn/sdk/src/dfx_info" }
+ic-http-agent = { path = "/Users/matthew/dfn/sdk/src/ic_http_agent" }
+
 [lib]
 name = "zqm_engine"
 path = "src/lib/mod.rs"

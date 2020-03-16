@@ -16,6 +16,11 @@ hashcons = "0.1"
 sdl2 = "0.32"
 zqm-engine = { path = "../engine" }
 
+#serde-idl = { path = "/Users/matthew/dfn/sdk/src/serde_idl" }
+#dfx_derive = { path = "/Users/matthew/dfn/sdk/src/dfx_derive" }
+#dfx_info = { path = "/Users/matthew/dfn/sdk/src/dfx_info" }
+#ic-http-agent = { path = "/Users/matthew/dfn/sdk/src/ic_http_agent" }
+
 [[bin]]
 name = "zqm-shell"
 path = "src/bin/zqm.rs"
