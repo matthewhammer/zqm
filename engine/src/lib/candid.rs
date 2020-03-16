@@ -24,13 +24,13 @@ fn name_of_idllabel(l: &Label) -> Name {
     }
 }
 
-fn menutype_of_idltype(t: &IDLType) -> MenuType {
+fn menutype_of_idltype(env: &Env, t: &IDLType) -> MenuType {
     match t {
         IDLType::RecordT(fields) => {
             let mut out = vec![];
             for field in fields.iter() {
                 let n = name_of_idllabel(&field.label);
-                let t = menutype_of_idltype(&field.typ);
+                let t = menutype_of_idltype(env, &field.typ);
                 out.push((n, t))
             }
             MenuType::Product(out)
@@ -39,18 +39,18 @@ fn menutype_of_idltype(t: &IDLType) -> MenuType {
             let mut out = vec![];
             for field in fields.iter() {
                 let n = name_of_idllabel(&field.label);
-                let t = menutype_of_idltype(&field.typ);
+                let t = menutype_of_idltype(env, &field.typ);
                 out.push((n, t))
             }
             MenuType::Variant(out)
         }
         IDLType::OptT(t) => {
-            let mt = menutype_of_idltype(t);
+            let mt = menutype_of_idltype(env, t);
             MenuType::Option(Box::new(mt))
         }
-        IDLType::VarT(v) => MenuType::Var(Name::Atom(Atom::String(v.clone()))),
+        IDLType::VarT(v) => menutype_resolve_var(env, v, 0),
         IDLType::VecT(t) => {
-            let t = menutype_of_idltype(&*t);
+            let t = menutype_of_idltype(env, &*t);
             MenuType::Vec(Box::new(t))
         }
         IDLType::PrimT(Nat) => MenuType::Prim(menu::PrimType::Nat),
@@ -60,12 +60,28 @@ fn menutype_of_idltype(t: &IDLType) -> MenuType {
     }
 }
 
+pub fn menutype_resolve_var(env: &Env, v: &String, depth: usize) -> MenuType {
+    if depth > 100 {
+        MenuType::Var(Name::Atom(Atom::String(v.clone())))
+    } else {
+        match env.get(v) {
+            None => MenuType::Var(Name::Atom(Atom::String(v.clone()))),
+            Some(MenuType::Var(Name::Atom(Atom::String(v)))) => {
+                menutype_resolve_var(env, v, depth + 1)
+            }
+            Some(MenuType::Var(_)) => unreachable!(),
+            Some(t) => t.clone(),
+        }
+    }
+}
+
 pub fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
+    let mut emp = HashMap::new();
     let mut env = HashMap::new();
     for dec in p.decs.iter() {
         match dec {
             Dec::TypD(ref b) => {
-                let t = menutype_of_idltype(&b.typ);
+                let t = menutype_of_idltype(&emp, &b.typ);
                 //print!("{:?}", b);
                 drop(env.insert(b.id.clone(), t))
             }
@@ -80,8 +96,11 @@ pub fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
                 let i = method.id.clone();
                 let t = match method.typ {
                     IDLType::FuncT(ref ft) => {
-                        let arg_types: Vec<MenuType> =
-                            ft.args.iter().map(|a| menutype_of_idltype(a)).collect();
+                        let arg_types: Vec<MenuType> = ft
+                            .args
+                            .iter()
+                            .map(|a| menutype_of_idltype(&env, a))
+                            .collect();
                         let mut fields = vec![];
                         for i in 0..arg_types.len() {
                             fields
