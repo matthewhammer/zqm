@@ -682,9 +682,9 @@ pub mod io {
         }
     }
 
-    pub fn render_elms(menu: &MenuState) -> Result<Elms, String> {
-        use crate::render::{FlowAtts, FrameType, TextAtts};
+    use crate::render::{FlowAtts, FrameType, TextAtts};
 
+    pub fn render_elms(menu: &MenuState, r: &mut Render) {
         fn black_fill() -> Fill {
             //Fill::Closed(Color::RGB(0, 0, 0))
             Fill::None
@@ -1145,13 +1145,13 @@ pub mod io {
             };
             r.end();
         };
-        let mut r = Render::new();
         r.begin(&Name::Void, FrameType::Flow(vert_flow()));
         if true {
-            r.str("hello world!", &text_atts());
-            r.str(" please, enter a value to submit:", &msg_atts());
-            r.str(" (Auto-fill and navigate with arrow keys)", &msg_atts());
-
+            if false {
+                r.str("hello world!", &text_atts());
+                r.str(" please, enter a value to submit:", &msg_atts());
+                r.str(" (Auto-fill and navigate with arrow keys)", &msg_atts());
+            }
             let r_tree = {
                 let mut r_tree = Render::new();
                 r_tree.begin(&Name::Void, FrameType::Flow(vert_flow()));
@@ -1168,10 +1168,9 @@ pub mod io {
                 r_tree.end();
                 r_tree
             };
-            render_ctx(&menu.ctx, &mut r, r_tree);
+            render_ctx(&menu.ctx, r, r_tree);
         }
         r.end();
-        Ok(r.into_elms())
     }
 }
 

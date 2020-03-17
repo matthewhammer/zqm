@@ -163,13 +163,23 @@ pub fn agent(url: &str) -> Result<Agent, ic_http_agent::AgentError> {
     })
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+pub struct Call {
+    pub method: String,
+    pub args: menu::MenuTree,
+    pub args_idl: String,
+    pub rets_idl: Option<String>,
+    pub rets: Option<menu::MenuTree>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Repl {
     pub config: Config,
+    pub history: Vec<Call>,
     // todo: log of results, parsed into MenuTree's according to the MenuType of the result type
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Config {
     //idl_prog: IDLProg,
     pub replica_url: String,
@@ -185,6 +195,7 @@ pub fn init(url: &str, cid_text: &str, p: &IDLProg) -> Result<State, String> {
     let mt: menu::MenuType = menutype_of_idlprog(p);
     let mut st = State {
         stack: vec![Frame::from_editor(Editor::CandidRepl(Box::new(Repl {
+            history: vec![],
             config: Config {
                 //idl_prog: p.clone(),
                 menu_type: mt.clone(),
@@ -203,6 +214,101 @@ pub fn init(url: &str, cid_text: &str, p: &IDLProg) -> Result<State, String> {
     )));
     eval::command_eval(&mut st, &cmd)?;
     Ok(st)
+}
+
+use crate::render::{FlowAtts, FrameType, Render, TextAtts};
+use types::{
+    lang::Dir2D,
+    render::{Color, Dim, Elms, Fill},
+};
+
+pub fn render_elms(repl: &Repl, r: &mut Render) {
+    fn text_zoom() -> usize {
+        2
+    }
+    fn horz_flow() -> FlowAtts {
+        FlowAtts {
+            dir: Dir2D::Right,
+            intra_pad: 2,
+            inter_pad: 2,
+        }
+    }
+    fn vert_flow() -> FlowAtts {
+        FlowAtts {
+            dir: Dir2D::Down,
+            intra_pad: 2,
+            inter_pad: 2,
+        }
+    }
+    fn glyph_padding() -> usize {
+        1
+    }
+    // eventaually we get these atts from
+    //  some environment-determined settings
+    fn glyph_flow() -> FlowAtts {
+        FlowAtts {
+            dir: Dir2D::Right,
+            intra_pad: glyph_padding(),
+            inter_pad: glyph_padding(),
+        }
+    }
+    fn glyph_dim() -> Dim {
+        Dim {
+            width: 5,
+            height: 5,
+        }
+    }
+    fn kw_atts() -> TextAtts {
+        TextAtts {
+            zoom: text_zoom(),
+            fg_fill: Fill::Closed(Color::RGB(255, 230, 255)),
+            bg_fill: Fill::None,
+            glyph_dim: glyph_dim(),
+            glyph_flow: glyph_flow(),
+        }
+    }
+    fn data_atts() -> TextAtts {
+        TextAtts {
+            zoom: text_zoom(),
+            fg_fill: Fill::Closed(Color::RGB(230, 230, 230)),
+            bg_fill: Fill::None,
+            glyph_dim: glyph_dim(),
+            glyph_flow: glyph_flow(),
+        }
+    };
+    fn msg_atts() -> TextAtts {
+        TextAtts {
+            zoom: text_zoom(),
+            fg_fill: Fill::Closed(Color::RGB(200, 200, 255)),
+            bg_fill: Fill::None,
+            glyph_dim: glyph_dim(),
+            glyph_flow: glyph_flow(),
+        }
+    };
+    fn box_fill() -> Fill {
+        Fill::Open(Color::RGB(50, 100, 50), 1)
+    };
+
+    if repl.history.len() > 0 {
+        r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+        r.str("Message log:", &msg_atts());
+        r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+        r.fill(box_fill());
+        for call in repl.history.iter() {
+            r.begin(&Name::Void, FrameType::Flow(horz_flow()));
+            r.str(&call.method, &msg_atts());
+            r.text(&call.args_idl, &data_atts());
+            if let Some(rets_idl) = &call.rets_idl {
+                r.str("━━►", &kw_atts());
+                r.text(rets_idl, &data_atts());
+            } else {
+                r.str("...(waiting)", &kw_atts());
+            }
+            r.end()
+        }
+        r.end();
+        r.end()
+    }
 }
 
 #[test]

@@ -78,11 +78,11 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                 &Some((ref lab, ref tree, ref typ)) => {
                     let method = format!("{}", lab);
                     let str = format!("({})", tree);
-                    info!("to do: send message {}({})", method, str);
+                    info!("sending message {}({})", method, str);
                     let args = &str.parse::<IDLArgs>().unwrap();
                     info!("...as {}({})", method, args);
 
-                    if let Editor::CandidRepl(ref repl) = state.frame.editor {
+                    if let &mut Editor::CandidRepl(ref mut repl) = &mut state.frame.editor {
                         use ic_http_agent::{Blob, CanisterId, Waiter};
                         use std::time::Duration;
                         use tokio::runtime::Runtime;
@@ -113,9 +113,17 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                         let result = serde_idl::IDLArgs::from_bytes(&(*blob_res.0));
                         if result.is_err() {
                             error!("Could not deserialize blob");
+                        } else {
+                            info!("..read result {:?}", result);
+                            let call = candid::Call {
+                                method: method,
+                                args: tree.clone(),
+                                args_idl: str.to_string(),
+                                rets_idl: Some(format!("{:?}", result.unwrap().args)),
+                                rets: None,
+                            };
+                            repl.history.push(call)
                         }
-
-                        info!("..read result {:?}", result);
                     } else {
                         unreachable!()
                     }
@@ -163,23 +171,42 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
     }
 }
 
-pub fn render_elms(state: &State) -> Result<render::Elms, String> {
-    match &state.frame.editor {
-        &Editor::CandidRepl(ref repl) => {
-            warn!("to do: render elements for candid repl");
-            Ok(vec![])
-        }
+use crate::render::{FlowAtts, FrameType, Render, TextAtts};
+use types::lang::{Dir2D, Name};
+
+pub fn render_elms_of_editor(editor: &Editor, r: &mut Render) {
+    match editor {
+        &Editor::CandidRepl(ref repl) => candid::render_elms(repl, r),
         &Editor::Bitmap(ref ed) => match ed.state {
-            None => Ok(vec![]),
-            Some(ref ed) => super::bitmap::io::render_elms(ed),
+            None => warn!("to do: render empty bitmap editor?"),
+            Some(ref ed) => unimplemented!(), //super::bitmap::io::render_elms(ed, r),
         },
         &Editor::Menu(ref ed) => match ed.state {
-            None => Ok(vec![]),
-            Some(ref st) => super::menu::io::render_elms(st),
+            None => warn!("to do: render empty bitmap editor?"),
+            Some(ref st) => menu::io::render_elms(st, r),
         },
         &Editor::Chain(ref _ch) => unimplemented!(),
         &Editor::Grid(ref _gr) => unimplemented!(),
     }
+}
+
+pub fn render_elms(state: &State) -> Result<render::Elms, String> {
+    let mut r = Render::new();
+    fn vert_flow() -> FlowAtts {
+        FlowAtts {
+            dir: Dir2D::Down,
+            intra_pad: 2,
+            inter_pad: 2,
+        }
+    };
+    // to do: acquire and use the screen dimension for "clip flows".
+    r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+    for frame in state.stack.iter() {
+        render_elms_of_editor(&frame.editor, &mut r);
+    }
+    render_elms_of_editor(&state.frame.editor, &mut r);
+    r.end();
+    Ok(r.into_elms())
 }
 
 pub fn get_persis_state_path() -> String {

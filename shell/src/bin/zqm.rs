@@ -286,9 +286,7 @@ fn main() {
             let contents = fs::read_to_string(&did_file).expect("reading candid file");
             let ast = candid::parse_idl(&contents);
             //let menu = candid::menutype_of_idlprog_service(&ast);
-            let mut state =
-                candid::init(replica_url.as_str(), canister_id.as_str(), &ast)
-                    .unwrap();
+            let mut state = candid::init(replica_url.as_str(), canister_id.as_str(), &ast).unwrap();
             do_event_loop(&mut state).unwrap();
             eval::save_state(&state);
         }
