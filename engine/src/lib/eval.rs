@@ -1,6 +1,7 @@
 // to-do/question: rename this module to 'engine'?
 
 use bitmap;
+use candid;
 use menu;
 
 pub enum LoadState {
@@ -10,13 +11,14 @@ pub enum LoadState {
 
 pub use super::types::{
     event::Event,
-    lang::{Command, Editor, State},
+    lang::{Command, Editor, Media, State},
     render,
 };
 
 pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command>, ()> {
     debug!("commands_of_event {:?}", event);
     let res = match &mut state.frame.editor {
+        &mut Editor::CandidRepl(ref _repl) => unimplemented!(),
         &mut Editor::Bitmap(ref _ed) => {
             // to do -- insert a name into each command that is unique,
             // but whose structure encodes a wallclock timestamp, among other sequence numbers.
@@ -50,32 +52,123 @@ pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command
     res
 }
 
+use serde_idl::value::{IDLArgs, IDLField, IDLValue};
+
 pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> {
-    debug!("command_eval {:?}", command);
-    let res = match (command, &mut state.frame.editor) {
-        (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
-            super::bitmap::semantics::editor_eval(be, bc)
-        }
-        (&Command::Bitmap(ref _bc), _) => Err("bitmap editor expected bitmap command".to_string()),
-        (_, &mut Editor::Bitmap(ref mut _be)) => {
-            Err("bitmap command for non-bitmap editor".to_string())
-        }
+    if let &Command::Return(ref media) = command {
+        info!("command_eval: return...");
 
-        (&Command::Menu(ref c), &mut Editor::Menu(ref mut e)) => {
-            super::menu::semantics::editor_eval(e, c)
+        if state.stack.len() == 0 {
+            Err(format!("cannot return; empty stack"))
+        } else {
+            let old_top = state.frame.clone();
+            state.frame = state.stack.pop().unwrap();
+            let resume = Command::Resume(media.clone(), old_top);
+            command_eval(state, &resume)
         }
-        (&Command::Menu(ref _c), _) => Err("menu editor expected menu command".to_string()),
-        (_, &mut Editor::Menu(ref mut _e)) => Err("menu command for non-menu editor".to_string()),
+    } else if let &Command::Resume(Media::MenuTree(ref mt), ref old_frame) = command {
+        info!("command_eval: resume, with menu tree...");
 
-        (&Command::Chain(ref _ch), _) => unimplemented!(),
-        (&Command::Grid(ref _gr), _) => unimplemented!(),
-    };
-    debug!("command_eval {:?} ==> {:?}", command, res);
-    res
+        // to do: clean, refactor and move this logic (e.g., into the candid module)
+        match &**mt {
+            &menu::MenuTree::Variant(ref ch) => match &ch.choice {
+                None => {
+                    warn!("no choice selected; try again...");
+                }
+                &Some((ref lab, ref tree, ref typ)) => {
+                    let method = format!("{}", lab);
+                    let str = format!("({})", tree);
+                    info!("to do: send message {}({})", method, str);
+                    let args = &str.parse::<IDLArgs>().unwrap();
+                    info!("...as {}({})", method, args);
+
+                    if let Editor::CandidRepl(ref repl) = state.frame.editor {
+                        use ic_http_agent::{Blob, CanisterId, Waiter};
+                        use std::time::Duration;
+                        use tokio::runtime::Runtime;
+
+                        info!(
+                            "...to canister_id {:?} at replica_url {:?}",
+                            repl.config.canister_id, repl.config.replica_url
+                        );
+
+                        let mut runtime = Runtime::new().expect("Unable to create a runtime");
+                        let waiter = Waiter::builder()
+                            .throttle(Duration::from_millis(100))
+                            .timeout(Duration::from_secs(60))
+                            .build();
+                        let agent = candid::agent(&repl.config.replica_url).unwrap();
+                        let canister_id =
+                            CanisterId::from_text(repl.config.canister_id.clone()).unwrap();
+                        let blob_res = runtime
+                            .block_on(agent.call_and_wait(
+                                &canister_id,
+                                &method,
+                                &Blob(args.to_bytes().unwrap()),
+                                waiter,
+                            ))
+                            .unwrap()
+                            .unwrap();
+
+                        let result = serde_idl::IDLArgs::from_bytes(&(*blob_res.0));
+                        if result.is_err() {
+                            error!("Could not deserialize blob");
+                        }
+
+                        info!("..read result {:?}", result);
+                    } else {
+                        unreachable!()
+                    }
+                }
+            },
+            _ => unreachable!("broken invariants"),
+        }
+        state.stack.push(state.frame.clone());
+        state.frame = old_frame.clone();
+        Ok(())
+    } else {
+        info!("command_eval {:?}", command);
+        let res = match (command, &mut state.frame.editor) {
+            (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
+                super::bitmap::semantics::editor_eval(be, bc)
+            }
+            (&Command::Bitmap(ref _bc), _) => {
+                Err("bitmap editor expected bitmap command".to_string())
+            }
+            (_, &mut Editor::Bitmap(ref mut _be)) => {
+                Err("bitmap command for non-bitmap editor".to_string())
+            }
+
+            (&Command::Menu(ref c), &mut Editor::Menu(ref mut e)) => {
+                match super::menu::semantics::editor_eval(e, c) {
+                    Ok(()) => Ok(()),
+                    Err(menu::Halt::Commit(mt)) => {
+                        command_eval(state, &Command::Return(Media::MenuTree(Box::new(mt))))
+                    }
+                    Err(menu::Halt::Message(m)) => Err(m),
+                }
+            }
+            (&Command::Menu(ref _c), _) => Err("menu editor expected menu command".to_string()),
+            (_, &mut Editor::Menu(ref mut _e)) => {
+                Err("menu command for non-menu editor".to_string())
+            }
+
+            (&Command::Chain(ref _ch), _) => unimplemented!(),
+            (&Command::Grid(ref _gr), _) => unimplemented!(),
+            (&Command::Return(_), _) => unimplemented!(),
+            (&Command::Resume(_, _), _) => unimplemented!(),
+        };
+        debug!("command_eval {:?} ==> {:?}", command, res);
+        res
+    }
 }
 
 pub fn render_elms(state: &State) -> Result<render::Elms, String> {
     match &state.frame.editor {
+        &Editor::CandidRepl(ref repl) => {
+            warn!("to do: render elements for candid repl");
+            Ok(vec![])
+        }
         &Editor::Bitmap(ref ed) => match ed.state {
             None => Ok(vec![]),
             Some(ref ed) => super::bitmap::io::render_elms(ed),

@@ -1,12 +1,17 @@
+use serde::{Deserialize, Serialize};
 extern crate serde_idl;
 
 use menu;
 use menu::MenuType;
 use types::lang::{Atom, Name};
 
+use ic_http_agent::{Agent, AgentConfig, Blob, CanisterId};
 use serde_idl::grammar::IDLProgParser;
 use serde_idl::lexer::Lexer;
-use serde_idl::types::{to_pretty, Dec, IDLProg, IDLType, Label};
+use serde_idl::{
+    types::{Dec, IDLProg, IDLType, Label},
+    value::IDLArgs,
+};
 
 use std::collections::HashMap;
 pub type Env = HashMap<String, MenuType>;
@@ -73,7 +78,18 @@ fn menutype_of_idltype(env: &Env, t: &IDLType) -> MenuType {
     }
 }
 
+pub fn idlargs_of_menutree(mt: &menu::MenuTree) -> String {
+    format!("{}", mt)
+}
+
+pub fn blob_of_menutree(mt: &menu::MenuTree) -> Blob {
+    let args: String = idlargs_of_menutree(mt);
+    let args: IDLArgs = args.parse().unwrap();
+    Blob(args.to_bytes().unwrap())
+}
+
 pub fn menutype_resolve_var(env: &Env, v: &String, depth: usize) -> MenuType {
+    // to do -- what is the real threshold in the def again?
     if depth > 100 {
         MenuType::Var(Name::Atom(Atom::String(v.clone())))
     } else {
@@ -88,7 +104,7 @@ pub fn menutype_resolve_var(env: &Env, v: &String, depth: usize) -> MenuType {
     }
 }
 
-pub fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
+pub fn menutype_of_idlprog(p: &IDLProg) -> menu::MenuType {
     let mut emp = HashMap::new();
     let mut env = HashMap::new();
     for dec in p.decs.iter() {
@@ -140,12 +156,42 @@ pub fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
     }
 }
 
+pub fn agent(url: &str) -> Result<Agent, ic_http_agent::AgentError> {
+    Agent::new(AgentConfig {
+        url: format!("http://{}", url).as_str(),
+        ..AgentConfig::default()
+    })
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct Repl {
+    pub config: Config,
+    // todo: log of results, parsed into MenuTree's according to the MenuType of the result type
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub struct Config {
+    //idl_prog: IDLProg,
+    pub replica_url: String,
+    pub canister_id: String,
+    pub menu_type: MenuType,
+}
+
 use types::lang::{Command, Editor, Frame, State};
-pub fn init_of_idlprog_ast(p: &IDLProg) -> Result<State, String> {
+pub fn init(url: &str, cid_text: &str, p: &IDLProg) -> Result<State, String> {
     use eval;
-    let mt: menu::MenuType = menutype_of_idlprog_service(p);
+    let cid: CanisterId = CanisterId::from_text(cid_text).unwrap();
+    assert_eq!(cid.to_text(), cid_text);
+    let mt: menu::MenuType = menutype_of_idlprog(p);
     let mut st = State {
-        stack: vec![],
+        stack: vec![Frame::from_editor(Editor::CandidRepl(Box::new(Repl {
+            config: Config {
+                //idl_prog: p.clone(),
+                menu_type: mt.clone(),
+                replica_url: url.to_string(),
+                canister_id: cid.to_string(),
+            },
+        })))],
         frame: Frame::from_editor(Editor::Menu(Box::new(menu::Editor {
             state: None,
             history: vec![],

@@ -2,11 +2,6 @@ extern crate serde_idl;
 
 use candid;
 use menu;
-use menu::MenuType;
-
-use serde_idl::grammar::IDLProgParser;
-use serde_idl::lexer::Lexer;
-use serde_idl::types::{to_pretty, IDLProg, IDLType, Label};
 
 use eval;
 use types::lang::{Atom, Command, Editor, Frame, FrameCont, Name, State};
@@ -21,8 +16,8 @@ service server : {
   h : (a: nat, b:record { nat; nat; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; }) -> () oneway;
 }
     "#;
-            let idl_ast = candid::parse_idl(&idl_spec);
-            let menu_type = candid::menutype_of_idlprog_service(&idl_ast);
+            let idlprog = candid::parse_idl(&idl_spec);
+            let menu_type = candid::menutype_of_idlprog(&idlprog);
             (
                 State {
                     stack: vec![],

@@ -1,6 +1,6 @@
 /// The ZQM language: abstract syntax
 pub mod lang {
-    use crate::{bitmap, chain, grid, menu};
+    use crate::{bitmap, candid, chain, grid, menu};
     use hashcons::merkle::Merkle;
     use serde::{Deserialize, Serialize};
 
@@ -12,6 +12,7 @@ pub mod lang {
         Atom(Atom),
         Name(Name),
         Location(Location),
+        MenuTree(Box<menu::MenuTree>),
         Bitmap(Box<bitmap::Bitmap>),
         Chain(Box<chain::Chain>),
         Grid(Box<grid::Grid>),
@@ -100,22 +101,23 @@ pub mod lang {
         pub content: Media,
     }
 
-    #[derive(Debug, Serialize, Deserialize, Hash)]
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub enum Editor {
+        CandidRepl(Box<candid::Repl>),
         Bitmap(Box<bitmap::Editor>),
         Menu(Box<menu::Editor>),
         Chain(Box<chain::Editor>),
         Grid(Box<grid::Editor>),
     }
 
-    #[derive(Debug, Serialize, Deserialize, Hash)]
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct Frame {
         pub name: Name,
         pub editor: Editor,
         pub cont: FrameCont,
     }
 
-    #[derive(Debug, Serialize, Deserialize, Hash)]
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct FrameCont {
         pub var: Name,
         pub commands: Vec<Command>,
@@ -125,6 +127,8 @@ pub mod lang {
     // for expressing scripts, etc; then we'd need to do substitution, or more env-passing, or both.
     #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
     pub enum Command {
+        Return(Media),
+        Resume(Media, Frame),
         Menu(menu::Command),
         Bitmap(bitmap::Command),
         Chain(chain::Command),

@@ -48,24 +48,24 @@ pub enum MenuTree {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct LabelSelect {
-    before: Vec<(Label, MenuTree, MenuType)>,
-    ctx: MenuCtx,
-    label: Label,
-    after: Vec<(Label, MenuTree, MenuType)>,
+    pub before: Vec<(Label, MenuTree, MenuType)>,
+    pub ctx: MenuCtx,
+    pub label: Label,
+    pub after: Vec<(Label, MenuTree, MenuType)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct PosSelect {
-    before: Vec<(Label, MenuTree, MenuType)>,
-    ctx: MenuCtx,
-    after: Vec<(Label, MenuTree, MenuType)>,
+    pub before: Vec<(Label, MenuTree, MenuType)>,
+    pub ctx: MenuCtx,
+    pub after: Vec<(Label, MenuTree, MenuType)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct LabelChoice {
-    before: Vec<(Label, MenuTree, MenuType)>,
-    choice: Option<(Label, MenuTree, MenuType)>,
-    after: Vec<(Label, MenuTree, MenuType)>,
+    pub before: Vec<(Label, MenuTree, MenuType)>,
+    pub choice: Option<(Label, MenuTree, MenuType)>,
+    pub after: Vec<(Label, MenuTree, MenuType)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -76,6 +76,7 @@ pub enum Error {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum Tag {
+    Root,
     Prim(PrimType),
     Variant,
     Product,
@@ -101,22 +102,23 @@ pub enum AutoCommand {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum EditCommand {
+    Commit,
     Descend,
     Ascend,
     PrevSibling,
     NextSibling,
-    GotoRoot,       // ---?
-    AutoFill,       // Tab
-    Clear,          // Backspace
-    NextTree,       // ArrowRight
-    PrevTree,       // ArrowLeft
-    NextBlank,      // ---?
-    PrevBlank,      // ---?
-    NextVariant,    // ArrowRight
-    PrevVariant,    // ArrowLefet
-    AcceptVariant,  // Enter
-    VecInsertBlank, // ---?
-    VecInsertAuto,  // ---?
+    GotoRoot,
+    AutoFill,
+    Clear,
+    NextTree,
+    PrevTree,
+    NextBlank,
+    PrevBlank,
+    NextVariant,
+    PrevVariant,
+    AcceptVariant,
+    VecInsertBlank,
+    VecInsertAuto,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
@@ -150,11 +152,16 @@ pub struct Editor {
     pub history: Vec<Command>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+pub enum Halt {
+    Commit(MenuTree),
+    Message(String),
+}
+
 pub mod semantics {
     use super::*;
 
-    pub type Err = String;
-    pub type Res = Result<(), Err>;
+    pub type Res = Result<(), Halt>;
 
     pub fn editor_eval(menu: &mut Editor, command: &Command) -> Res {
         trace!("editor_eval({:?}) begin", command);
@@ -169,7 +176,7 @@ pub mod semantics {
                 Ok(())
             }
             Command::Edit(ref c) => match menu.state {
-                None => Err("Invalid editor state".to_string()),
+                None => Err(Halt::Message("Invalid editor state".to_string())),
                 Some(ref mut st) => state_eval_command(st, c),
             },
             Command::Auto(ref _c) => unimplemented!(),
@@ -181,6 +188,10 @@ pub mod semantics {
 
     pub fn state_eval_command(menu: &mut MenuState, command: &EditCommand) -> Res {
         match command {
+            &EditCommand::Commit => {
+                goto_root(menu)?;
+                Err(Halt::Commit(menu.tree.clone()))
+            }
             &EditCommand::GotoRoot => goto_root(menu),
             &EditCommand::AutoFill => {
                 let tree = auto_fill(&menu.tree_typ, 1);
@@ -240,7 +251,7 @@ pub mod semantics {
 
     pub fn ctx_tag(ctx: &MenuCtx) -> Tag {
         match ctx {
-            MenuCtx::Root(typ) => typ_tag(typ),
+            MenuCtx::Root(typ) => Tag::Root,
             MenuCtx::Product(_) => Tag::Product,
             MenuCtx::Variant(_) => Tag::Variant,
             MenuCtx::Option(_, _) => Tag::Option,
@@ -267,7 +278,10 @@ pub mod semantics {
         if &tt == tag {
             Ok(())
         } else {
-            Err(format!("expected {:?} but found {:?}: {:?}", tag, tt, tree))
+            Err(Halt::Message(format!(
+                "expected {:?} but found {:?}: {:?}",
+                tag, tt, tree
+            )))
         }
     }
 
@@ -281,7 +295,7 @@ pub mod semantics {
         }
     }
 
-    pub fn next_blank(menu: &mut MenuState) -> Result<MenuType, Err> {
+    pub fn next_blank(menu: &mut MenuState) -> Result<MenuType, Halt> {
         match menu.tree {
             MenuTree::Blank(ref t) => Ok(t.clone()),
             _ => {
@@ -291,7 +305,7 @@ pub mod semantics {
         }
     }
 
-    pub fn prev_blank(menu: &mut MenuState) -> Result<MenuType, Err> {
+    pub fn prev_blank(menu: &mut MenuState) -> Result<MenuType, Halt> {
         match menu.tree {
             MenuTree::Blank(ref t) => Ok(t.clone()),
             _ => {
@@ -329,7 +343,7 @@ pub mod semantics {
 
     pub fn ascend(menu: &mut MenuState) -> Res {
         match menu.ctx.clone() {
-            MenuCtx::Root(_) => Err("cannot ascend: already at root".to_string()),
+            MenuCtx::Root(_) => Err(Halt::Message("cannot ascend: already at root".to_string())),
             MenuCtx::Product(mut sel) => {
                 let mut arms = sel.before;
                 arms.push((sel.label, menu.tree.clone(), menu.tree_typ.clone()));
@@ -371,7 +385,7 @@ pub mod semantics {
     pub fn descend(menu: &mut MenuState, dir: Dir1D) -> Res {
         // navigate product field structure; ignore unchosen variant options.
         match menu.tree {
-            MenuTree::Blank(_) => Err("no subtrees".to_string()),
+            MenuTree::Blank(_) => Err(Halt::Message("no subtrees".to_string())),
             MenuTree::Product(ref trees) => {
                 let mut trees = trees.clone();
                 if trees.len() > 0 {
@@ -403,7 +417,7 @@ pub mod semantics {
                         }
                     }
                 } else {
-                    Err("no subtrees".to_string())
+                    Err(Halt::Message("no subtrees".to_string()))
                 }
             }
             MenuTree::Variant(ref trees) => {
@@ -422,12 +436,12 @@ pub mod semantics {
                             Ok(())
                         }
                     },
-                    None => Err("no choice subtree".to_string()),
+                    None => Err(Halt::Message("no choice subtree".to_string())),
                 }
             }
             _ => {
                 // to do
-                Err("not implemented".to_string())
+                Err(Halt::Message("not implemented".to_string()))
             }
         }
     }
@@ -482,7 +496,7 @@ pub mod semantics {
                     }
                 }
             }
-            _ => Err("expected tree to be a variant".to_string()),
+            _ => Err(Halt::Message("expected tree to be a variant".to_string())),
         }
     }
 
@@ -637,6 +651,8 @@ pub mod io {
             (&Event::Quit { .. }, _, _) => Err(()),
             (&Event::KeyDown(ref kei), ref ctx, ref tree) => match (kei.key.as_str(), ctx, tree) {
                 ("Escape", _, _) => Err(()),
+                //("Enter", Tag::Root, _) => Ok(vec![EditCommand::Commit]),
+                ("Enter", _, _) => Ok(vec![EditCommand::Commit]),
                 ("Backspace", _, _) => Ok(vec![EditCommand::Clear]),
 
                 ("Tab", _, Tag::Blank) => Ok(vec![EditCommand::AutoFill]),
@@ -645,13 +661,11 @@ pub mod io {
                 ("ArrowLeft", _, _) => Ok(vec![EditCommand::Ascend]),
                 ("ArrowRight", _, _) => Ok(vec![EditCommand::Descend]),
 
-                ("ArrowUp", Tag::Variant, _) => Ok(vec![EditCommand::PrevVariant]),
-                ("ArrowDown", Tag::Variant, _) => Ok(vec![EditCommand::NextVariant]),
+                ("ArrowUp", _, Tag::Variant) => Ok(vec![EditCommand::PrevVariant]),
+                ("ArrowDown", _, Tag::Variant) => Ok(vec![EditCommand::NextVariant]),
 
                 ("ArrowUp", Tag::Product, _) => Ok(vec![EditCommand::PrevSibling]),
                 ("ArrowDown", Tag::Product, _) => Ok(vec![EditCommand::NextSibling]),
-
-                ("Enter", _, _) => Ok(vec![EditCommand::Descend]),
 
                 (key, ctx, tree) => {
                     warn!(
@@ -1162,6 +1176,68 @@ pub mod io {
 }
 
 use std::fmt;
+
+impl fmt::Display for MenuTree {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut first = true;
+        match self {
+            MenuTree::Product(ref fields) => {
+                write!(f, "record {{")?;
+                for (l, t, _) in fields.iter() {
+                    if !first {
+                        write!(f, "; ")?;
+                    };
+                    first = false;
+                    write!(f, "{}={}", l, t)?;
+                }
+                write!(f, "}}")
+            }
+            MenuTree::Variant(ref choice) => {
+                write!(f, "variant {{")?;
+                if let Some((ref l, ref t, _)) = choice.choice {
+                    write!(f, "{}={}", l, t)?;
+                } else {
+                    // nothing
+                }
+                write!(f, "}}")
+            }
+            MenuTree::Option(ref b, ref t, _) => {
+                if *b {
+                    write!(f, "opt {}", t)
+                } else {
+                    write!(f, "opt null")
+                }
+            }
+            MenuTree::Vec(ref ts, _) => {
+                write!(f, "vec{{")?;
+                for t in ts.iter() {
+                    if !first {
+                        write!(f, "; ")?;
+                    };
+                    first = false;
+                    write!(f, "{}", t)?;
+                }
+                write!(f, "}}")
+            }
+            MenuTree::Tup(ref ts) => {
+                write!(f, "(")?;
+                for (t, _) in ts.iter() {
+                    if !first {
+                        write!(f, ", ")?;
+                    };
+                    first = false;
+                    write!(f, "{}", t)?;
+                }
+                write!(f, ")")
+            }
+            MenuTree::Blank(_) => write!(f, "variant {{BLANK=()}}"),
+            MenuTree::Nat(n) => write!(f, "{}", n),
+            MenuTree::Text(t) => write!(f, "{:?}", t),
+            MenuTree::Bool(b) => write!(f, "{}", b),
+            MenuTree::Unit => write!(f, ""),
+        }
+    }
+}
 
 // move elsewhere
 impl fmt::Display for Name {

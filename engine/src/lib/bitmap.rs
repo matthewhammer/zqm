@@ -48,7 +48,7 @@ pub enum AutoCommand {
 // Define a canonical editor for the structure in question.  Again, use simplified, affine Rust.
 
 /// the history-_independent_ state of the editor
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct EditorState {
     /// created by an Init command; affected by Auto and Edit commands
     pub bitmap: Bitmap,
@@ -62,7 +62,7 @@ pub struct EditorState {
 //   includes the command history, and any "pre-states" before initialization completes.
 
 /// the history-_dependent_ state of the editoro
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Editor {
     /// full linear history of this bitmap's evolution, as a sequence of commands
     pub history: Vec<Command>,
