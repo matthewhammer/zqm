@@ -201,12 +201,21 @@ pub fn render_elms(state: &State) -> Result<render::Elms, String> {
             intra_pad: 2,
             inter_pad: 2,
         }
-    };
+    }
+    fn horz_flow() -> FlowAtts {
+        FlowAtts {
+            dir: Dir2D::Right,
+            intra_pad: 2,
+            inter_pad: 2,
+        }
+    }
     // to do: acquire and use the screen dimension for "clip flows".
+    r.begin(&Name::Void, FrameType::Flow(horz_flow()));
     r.begin(&Name::Void, FrameType::Flow(vert_flow()));
     for frame in state.stack.iter() {
         render_elms_of_editor(&frame.editor, &mut r);
     }
+    r.end();
     render_elms_of_editor(&state.frame.editor, &mut r);
     r.end();
     Ok(r.into_elms())

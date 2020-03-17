@@ -274,7 +274,16 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
     fn dim_atts() -> TextAtts {
         TextAtts {
             zoom: text_zoom(),
-            fg_fill: Fill::Closed(Color::RGB(200, 200, 200)),
+            fg_fill: Fill::Closed(Color::RGB(150, 100, 150)),
+            bg_fill: Fill::None,
+            glyph_dim: glyph_dim(),
+            glyph_flow: glyph_flow(),
+        }
+    }
+    fn dim2_atts() -> TextAtts {
+        TextAtts {
+            zoom: text_zoom(),
+            fg_fill: Fill::Closed(Color::RGB(200, 180, 200)),
             bg_fill: Fill::None,
             glyph_dim: glyph_dim(),
             glyph_flow: glyph_flow(),
@@ -308,15 +317,17 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
         r.begin(&Name::Void, FrameType::Flow(vert_flow()));
         r.fill(box_fill());
         for call in repl.history.iter() {
+            r.begin(&Name::Void, FrameType::Flow(vert_flow()));
             r.begin(&Name::Void, FrameType::Flow(horz_flow()));
             r.str(&call.method, &msg_atts());
             r.text(&call.args_idl, &data_atts());
+            r.end();
             if let Some(rets_idl) = &call.rets_idl {
-                r.str("━━►", &kw_atts());
+                r.begin(&Name::Void, FrameType::Flow(horz_flow()));
+                r.text(&format!(" {:?}", &call.duration), &dim_atts());
+                r.str("━━►", &dim2_atts());
                 r.text(rets_idl, &data_atts());
-                r.str("*━━━━━━(", &dim_atts());
-                r.text(&format!("{:?}", &call.duration), &data_atts());
-                r.str(")", &dim_atts());
+                r.end()
             } else {
                 r.str("...(waiting)", &kw_atts());
             }

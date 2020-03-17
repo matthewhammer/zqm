@@ -1065,7 +1065,7 @@ pub mod io {
                     r.begin(&Name::Void, FrameType::Flow(vert_flow()));
                     if show_detailed {
                         begin_item(r);
-                        r.text(&format!("Message choice:"), &msg_atts());
+                        r.text(&format!("choice:"), &msg_atts());
                         if let Some(_) = ch.choice {
                             // nothing
                         } else {
