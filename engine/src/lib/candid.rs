@@ -163,6 +163,8 @@ pub fn agent(url: &str) -> Result<Agent, ic_http_agent::AgentError> {
     })
 }
 
+use std::time::{Duration, SystemTime};
+
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Call {
     pub method: String,
@@ -170,6 +172,8 @@ pub struct Call {
     pub args_idl: String,
     pub rets_idl: Option<String>,
     pub rets: Option<menu::MenuTree>,
+    pub timestamp: SystemTime,
+    pub duration: Duration,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -267,6 +271,15 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
             glyph_flow: glyph_flow(),
         }
     }
+    fn dim_atts() -> TextAtts {
+        TextAtts {
+            zoom: text_zoom(),
+            fg_fill: Fill::Closed(Color::RGB(200, 200, 200)),
+            bg_fill: Fill::None,
+            glyph_dim: glyph_dim(),
+            glyph_flow: glyph_flow(),
+        }
+    }
     fn data_atts() -> TextAtts {
         TextAtts {
             zoom: text_zoom(),
@@ -301,6 +314,9 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
             if let Some(rets_idl) = &call.rets_idl {
                 r.str("━━►", &kw_atts());
                 r.text(rets_idl, &data_atts());
+                r.str("*━━━━━━(", &dim_atts());
+                r.text(&format!("{:?}", &call.duration), &data_atts());
+                r.str(")", &dim_atts());
             } else {
                 r.str("...(waiting)", &kw_atts());
             }

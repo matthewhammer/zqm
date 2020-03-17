@@ -100,6 +100,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                         let agent = candid::agent(&repl.config.replica_url).unwrap();
                         let canister_id =
                             CanisterId::from_text(repl.config.canister_id.clone()).unwrap();
+                        let timestamp = std::time::SystemTime::now();
                         let blob_res = runtime
                             .block_on(agent.call_and_wait(
                                 &canister_id,
@@ -109,13 +110,15 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                             ))
                             .unwrap()
                             .unwrap();
-
+                        let elapsed = timestamp.elapsed().unwrap();
                         let result = serde_idl::IDLArgs::from_bytes(&(*blob_res.0));
                         if result.is_err() {
                             error!("Could not deserialize blob");
                         } else {
                             info!("..read result {:?}", result);
                             let call = candid::Call {
+                                timestamp: timestamp,
+                                duration: elapsed,
                                 method: method,
                                 args: tree.clone(),
                                 args_idl: str.to_string(),
