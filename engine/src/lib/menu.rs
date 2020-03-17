@@ -750,10 +750,19 @@ pub mod io {
                 glyph_flow: glyph_flow(),
             }
         };
-        fn typ_atts() -> TextAtts {
+        fn typ_lab_atts() -> TextAtts {
             TextAtts {
                 zoom: 2,
                 fg_fill: Fill::Closed(Color::RGB(200, 255, 255)),
+                bg_fill: Fill::None,
+                glyph_dim: glyph_dim(),
+                glyph_flow: glyph_flow(),
+            }
+        };
+        fn typ_sym_atts() -> TextAtts {
+            TextAtts {
+                zoom: 2,
+                fg_fill: Fill::Closed(Color::RGB(180, 200, 200)),
                 bg_fill: Fill::None,
                 glyph_dim: glyph_dim(),
                 glyph_flow: glyph_flow(),
@@ -907,6 +916,7 @@ pub mod io {
         fn render_type(
             typ: &MenuType,
             text: &TextAtts,
+            text2: &TextAtts,
             vflow: &FlowAtts,
             hflow: &FlowAtts,
             r: &mut Render,
@@ -924,16 +934,18 @@ pub mod io {
                             if first {
                                 first = false;
                                 begin_flow(r, hflow);
-                                r.str("{", text);
+                                r.str("{ ", text2);
                             } else {
                                 r.end();
                                 begin_flow(r, hflow);
-                                r.str("; ", text);
+                                r.str("; ", text2);
                             };
-                            r.str(&format!("#{}: ", l), text);
-                            render_type(t, text, vflow, hflow, r);
+                            r.str("#", text2);
+                            r.str(&format!("{}", l), text);
+                            r.str(": ", text2);
+                            render_type(t, text, text2, vflow, hflow, r);
                         }
-                        r.str("}", text);
+                        r.str(" }", text2);
                         r.end();
                     } else {
                         unimplemented!()
@@ -947,73 +959,74 @@ pub mod io {
                             if first {
                                 first = false;
                                 begin_flow(r, hflow);
-                                r.str("{", text);
+                                r.str("{ ", text2);
                             } else {
                                 r.end();
                                 begin_flow(r, hflow);
-                                r.str("; ", text);
+                                r.str("; ", text2);
                             };
-                            r.str(&format!("{}: ", l), text);
-                            render_type(t, text, vflow, hflow, r);
+                            r.str(&format!("{}", l), text);
+                            r.str(":", text2);
+                            render_type(t, text, text2, vflow, hflow, r);
                         }
-                        r.str("}", text);
+                        r.str(" }", text2);
                         r.end();
                     } else {
-                        r.str("{ }", text);
+                        r.str("{ }", text2);
                     }
                     r.end()
                 }
                 MenuType::Var(n) => r.name(n, text),
                 MenuType::Option(t) => {
                     begin_flow(r, hflow);
-                    r.str("?", text);
-                    render_type(t, text, vflow, hflow, r);
+                    r.str("?", text2);
+                    render_type(t, text, text2, vflow, hflow, r);
                     r.end()
                 }
                 MenuType::Vec(t) => {
                     begin_flow(r, hflow);
-                    r.str("[", text);
-                    render_type(t, text, vflow, hflow, r);
-                    r.str("]", text);
+                    r.str("[", text2);
+                    render_type(t, text, text2, vflow, hflow, r);
+                    r.str("]", text2);
                     r.end()
                 }
                 MenuType::Tup(typs) => {
                     begin_flow(r, hflow);
-                    r.str("(", text);
+                    r.str("(", text2);
                     let mut not_first = false;
                     for t in typs.iter() {
                         if not_first {
-                            r.str(", ", text);
+                            r.str(", ", text2);
                         }
-                        render_type(t, text, vflow, hflow, r);
+                        render_type(t, text, text2, vflow, hflow, r);
                         not_first = true;
                     }
-                    r.str(")", text);
+                    r.str(")", text2);
                     r.end()
                 }
                 MenuType::Func(ft) => {
                     begin_flow(r, hflow);
-                    r.str("(", text);
+                    r.str("(", text2);
                     let mut not_first = false;
                     for t in ft.args.iter() {
                         if not_first {
-                            r.str(", ", text);
+                            r.str(", ", text2);
                         }
-                        render_type(t, text, vflow, hflow, r);
+                        render_type(t, text, text2, vflow, hflow, r);
                         not_first = true;
                     }
-                    r.str(")", text);
-                    r.str("->", text);
-                    r.str("(", text);
+                    r.str(")", text2);
+                    r.str("→", text2);
+                    r.str("(", text2);
                     let mut not_first = false;
                     for t in ft.rets.iter() {
                         if not_first {
-                            r.str(", ", text);
+                            r.str(", ", text2);
                         }
-                        render_type(t, text, vflow, hflow, r);
+                        render_type(t, text, text2, vflow, hflow, r);
                         not_first = true;
                     }
-                    r.str(")", text);
+                    r.str(")", text2);
                     r.end()
                 }
             }
@@ -1132,7 +1145,8 @@ pub mod io {
                 render_tree(&menu.tree, true, &detailed_tree_box_fill(), &mut r_tree);
                 render_type(
                     &menu.tree_typ,
-                    &typ_atts(),
+                    &typ_lab_atts(),
+                    &typ_sym_atts(),
                     &typ_vflow(),
                     &typ_hflow(),
                     &mut r_tree,

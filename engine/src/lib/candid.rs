@@ -109,17 +109,26 @@ pub fn menutype_of_idlprog_service(p: &IDLProg) -> menu::MenuType {
                 let i = method.id.clone();
                 let t = match method.typ {
                     IDLType::FuncT(ref ft) => {
-                        let arg_types: Vec<MenuType> = ft
-                            .args
-                            .iter()
-                            .map(|a| menutype_of_idltype(&env, a))
-                            .collect();
-                        let mut fields = vec![];
-                        for i in 0..arg_types.len() {
-                            fields
-                                .push((Name::Atom(Atom::Usize(fields.len())), arg_types[i].clone()))
+                        if ft.args.len() > 1 {
+                            let arg_types: Vec<MenuType> = ft
+                                .args
+                                .iter()
+                                .map(|a| menutype_of_idltype(&env, a))
+                                .collect();
+                            let mut fields = vec![];
+                            for i in 0..arg_types.len() {
+                                fields.push((
+                                    Name::Atom(Atom::Usize(fields.len())),
+                                    arg_types[i].clone(),
+                                ))
+                            }
+                            MenuType::Product(fields)
+                        } else if ft.args.len() == 1 {
+                            menutype_of_idltype(&env, &ft.args[0])
+                        } else {
+                            assert_eq!(ft.args.len(), 0);
+                            MenuType::Prim(menu::PrimType::Unit)
                         }
-                        MenuType::Product(fields)
                     }
                     _ => unreachable!(),
                 };
