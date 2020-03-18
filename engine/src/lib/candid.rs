@@ -170,8 +170,8 @@ pub struct Call {
     pub method: String,
     pub args: menu::MenuTree,
     pub args_idl: String,
-    pub rets_idl: Option<String>,
-    pub rets: Option<menu::MenuTree>,
+    pub rets_idl: Result<String, String>,
+    pub rets: Result<menu::MenuTree, String>,
     pub timestamp: SystemTime,
     pub duration: Duration,
 }
@@ -298,6 +298,15 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
             glyph_flow: glyph_flow(),
         }
     };
+    fn err_atts() -> TextAtts {
+        TextAtts {
+            zoom: text_zoom(),
+            fg_fill: Fill::Closed(Color::RGB(255, 100, 100)),
+            bg_fill: Fill::None,
+            glyph_dim: glyph_dim(),
+            glyph_flow: glyph_flow(),
+        }
+    };
     fn msg_atts() -> TextAtts {
         TextAtts {
             zoom: text_zoom(),
@@ -322,14 +331,26 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
             r.str(&call.method, &msg_atts());
             r.text(&call.args_idl, &data_atts());
             r.end();
-            if let Some(rets_idl) = &call.rets_idl {
-                r.begin(&Name::Void, FrameType::Flow(horz_flow()));
-                r.text(&format!(" {:?}", &call.duration), &dim_atts());
-                r.str("━━►", &dim2_atts());
-                r.text(rets_idl, &data_atts());
-                r.end()
-            } else {
-                r.str("...(waiting)", &kw_atts());
+            match call.rets_idl {
+                Ok(ref rets_idl) => {
+                    r.begin(&Name::Void, FrameType::Flow(horz_flow()));
+                    r.text(&format!(" {:?}", &call.duration), &dim_atts());
+                    r.str("━━►", &dim2_atts());
+                    r.text(rets_idl, &data_atts());
+                    r.end()
+                }
+                Err(ref msg) => {
+                    r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+                    r.begin(&Name::Void, FrameType::Flow(horz_flow()));
+                    r.text(&format!(" {:?}", &call.duration), &dim_atts());
+                    r.str("━━► ", &err_atts());
+                    r.end();
+                    r.begin(&Name::Void, FrameType::Flow(horz_flow()));
+                    r.str(&" ", &err_atts());
+                    r.text(msg, &err_atts());
+                    r.end();
+                    r.end();
+                }
             }
             r.end()
         }

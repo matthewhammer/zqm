@@ -420,6 +420,11 @@ pub mod semantics {
                     Err(Halt::Message("no subtrees".to_string()))
                 }
             }
+            MenuTree::Nat(ref n) => {
+                // to do -- move this logic
+                menu.tree = MenuTree::Nat(*n + 1);
+                Ok(())
+            }
             MenuTree::Variant(ref trees) => {
                 let trees = trees.clone();
                 match trees.choice {

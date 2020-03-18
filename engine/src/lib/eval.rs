@@ -56,7 +56,7 @@ use serde_idl::value::{IDLArgs, IDLField, IDLValue};
 
 pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> {
     if let &Command::Return(ref media) = command {
-        info!("command_eval: return...");
+        debug!("command_eval: return...");
 
         if state.stack.len() == 0 {
             Err(format!("cannot return; empty stack"))
@@ -67,7 +67,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
             command_eval(state, &resume)
         }
     } else if let &Command::Resume(Media::MenuTree(ref mt), ref old_frame) = command {
-        info!("command_eval: resume, with menu tree...");
+        debug!("command_eval: resume, with menu tree...");
 
         // to do: clean, refactor and move this logic (e.g., into the candid module)
         match &**mt {
@@ -78,9 +78,9 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                 &Some((ref lab, ref tree, ref typ)) => {
                     let method = format!("{}", lab);
                     let str = format!("({})", tree);
-                    info!("sending message {}({})", method, str);
+                    info!("Sending message \"{}\", with args {}", method, str);
                     let args = &str.parse::<IDLArgs>().unwrap();
-                    info!("...as {}({})", method, args);
+                    debug!("...as {}({})", method, args);
 
                     if let &mut Editor::CandidRepl(ref mut repl) = &mut state.frame.editor {
                         use ic_http_agent::{Blob, CanisterId, Waiter};
@@ -101,29 +101,39 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                         let canister_id =
                             CanisterId::from_text(repl.config.canister_id.clone()).unwrap();
                         let timestamp = std::time::SystemTime::now();
-                        let blob_res = runtime
-                            .block_on(agent.call_and_wait(
-                                &canister_id,
-                                &method,
-                                &Blob(args.to_bytes().unwrap()),
-                                waiter,
-                            ))
-                            .unwrap()
-                            .unwrap();
+                        let blob_res = runtime.block_on(agent.call_and_wait(
+                            &canister_id,
+                            &method,
+                            &Blob(args.to_bytes().unwrap()),
+                            waiter,
+                        ));
+
                         let elapsed = timestamp.elapsed().unwrap();
-                        let result = serde_idl::IDLArgs::from_bytes(&(*blob_res.0));
-                        if result.is_err() {
-                            error!("Could not deserialize blob");
-                        } else {
-                            info!("..read result {:?}", result);
+                        if let Ok(blob_res) = blob_res {
+                            let result = serde_idl::IDLArgs::from_bytes(&(*blob_res.unwrap().0));
+                            let res = format!("{:?}", result.unwrap().args);
+                            info!("..successful result {:?}", res);
                             let call = candid::Call {
                                 timestamp: timestamp,
                                 duration: elapsed,
                                 method: method,
                                 args: tree.clone(),
                                 args_idl: str.to_string(),
-                                rets_idl: Some(format!("{:?}", result.unwrap().args)),
-                                rets: None,
+                                rets_idl: Ok(res),
+                                rets: Err("<to do>".to_string()),
+                            };
+                            repl.history.push(call)
+                        } else {
+                            let res = format!("{:?}", blob_res);
+                            info!("..error result {:?}", res);
+                            let call = candid::Call {
+                                timestamp: timestamp,
+                                duration: elapsed,
+                                method: method,
+                                args: tree.clone(),
+                                args_idl: str.to_string(),
+                                rets_idl: Err(res),
+                                rets: Err("<to do>".to_string()),
                             };
                             repl.history.push(call)
                         }
@@ -138,7 +148,8 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
         state.frame = old_frame.clone();
         Ok(())
     } else {
-        info!("command_eval {:?}", command);
+        debug!("command_eval {:?}", command);
+        info!("{:?}", command);
         let res = match (command, &mut state.frame.editor) {
             (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
                 super::bitmap::semantics::editor_eval(be, bc)
