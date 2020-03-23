@@ -20,6 +20,7 @@ pub enum MenuType {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum PrimType {
+    Null,
     Unit,
     Nat,
     Text,
@@ -44,6 +45,7 @@ pub enum MenuTree {
     Text(Text),
     Bool(bool),
     Unit,
+    Null,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -56,9 +58,9 @@ pub struct LabelSelect {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct PosSelect {
-    pub before: Vec<(Label, MenuTree, MenuType)>,
+    pub before: Vec<(MenuTree, MenuType)>,
     pub ctx: MenuCtx,
-    pub after: Vec<(Label, MenuTree, MenuType)>,
+    pub after: Vec<(MenuTree, MenuType)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -131,11 +133,11 @@ pub enum Command {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub enum MenuCtx {
     Root(MenuType),
+    Tup(Box<PosSelect>),
     Product(Box<LabelSelect>),
     Variant(Box<LabelSelect>),
     Option(bool, Box<MenuCtx>),
     Vec(Box<PosSelect>),
-    Tup(Box<PosSelect>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -246,6 +248,7 @@ pub mod semantics {
             MenuTree::Bool(_) => Tag::Prim(PrimType::Bool),
             MenuTree::Text(_) => Tag::Prim(PrimType::Text),
             MenuTree::Unit => Tag::Prim(PrimType::Unit),
+            MenuTree::Null => Tag::Prim(PrimType::Null),
         }
     }
 
@@ -344,6 +347,25 @@ pub mod semantics {
     pub fn ascend(menu: &mut MenuState) -> Res {
         match menu.ctx.clone() {
             MenuCtx::Root(_) => Err(Halt::Message("cannot ascend: already at root".to_string())),
+            MenuCtx::Tup(sel) => {
+                let mut arms: Vec<(MenuTree, MenuType)> = sel
+                    .before
+                    .iter()
+                    .map(|(t, tt)| (t.clone(), tt.clone()))
+                    .collect();
+                arms.push((menu.tree.clone(), menu.tree_typ.clone()));
+                let mut after = sel
+                    .after
+                    .iter()
+                    .map(|(t, tt)| (t.clone(), tt.clone()))
+                    .collect();
+                arms.append(&mut after);
+                let fields: Vec<MenuType> = arms.iter().map(|(_, t)| t.clone()).collect();
+                menu.tree = MenuTree::Tup(arms);
+                menu.tree_typ = MenuType::Tup(fields);
+                menu.ctx = sel.ctx;
+                Ok(())
+            }
             MenuCtx::Product(mut sel) => {
                 let mut arms = sel.before;
                 arms.push((sel.label, menu.tree.clone(), menu.tree_typ.clone()));
@@ -378,7 +400,6 @@ pub mod semantics {
             }
             MenuCtx::Option(_flag, _menu) => unimplemented!(),
             MenuCtx::Vec(_sel) => unimplemented!(),
-            MenuCtx::Tup(_sel) => unimplemented!(),
         }
     }
 
@@ -386,6 +407,38 @@ pub mod semantics {
         // navigate product field structure; ignore unchosen variant options.
         match menu.tree {
             MenuTree::Blank(_) => Err(Halt::Message("no subtrees".to_string())),
+            MenuTree::Tup(ref trees) => {
+                let mut trees = trees.clone();
+                if trees.len() > 0 {
+                    match dir {
+                        Dir1D::Forward => {
+                            trees.rotate_left(1);
+                            let (tree, tree_t) = trees.pop().unwrap();
+                            menu.tree = tree;
+                            menu.tree_typ = tree_t;
+                            menu.ctx = MenuCtx::Tup(Box::new(PosSelect {
+                                before: vec![],
+                                ctx: menu.ctx.clone(),
+                                after: trees,
+                            }));
+                            Ok(())
+                        }
+                        Dir1D::Backward => {
+                            let (tree, tree_t) = trees.pop().unwrap();
+                            menu.tree = tree;
+                            menu.tree_typ = tree_t;
+                            menu.ctx = MenuCtx::Tup(Box::new(PosSelect {
+                                before: trees,
+                                ctx: menu.ctx.clone(),
+                                after: vec![],
+                            }));
+                            Ok(())
+                        }
+                    }
+                } else {
+                    Err(Halt::Message("no subtrees".to_string()))
+                }
+            }
             MenuTree::Product(ref trees) => {
                 let mut trees = trees.clone();
                 if trees.len() > 0 {
@@ -507,6 +560,20 @@ pub mod semantics {
 
     pub fn next_sibling(menu: &mut MenuState) -> Res {
         match menu.ctx.clone() {
+            MenuCtx::Tup(mut sel) => {
+                sel.before.push((menu.tree.clone(), menu.tree_typ.clone()));
+                if sel.after.len() > 0 {
+                    sel.after.rotate_left(1);
+                    let (tree, tree_typ) = sel.after.pop().unwrap();
+                    menu.tree = tree;
+                    menu.tree_typ = tree_typ;
+                    menu.ctx = MenuCtx::Tup(sel);
+                    Ok(())
+                } else {
+                    ascend(menu)?;
+                    descend(menu, Dir1D::Forward)
+                }
+            }
             MenuCtx::Product(mut sel) => {
                 sel.before
                     .push((sel.label, menu.tree.clone(), menu.tree_typ.clone()));
@@ -544,6 +611,20 @@ pub mod semantics {
                     menu.tree = tree;
                     menu.tree_typ = tree_typ;
                     menu.ctx = MenuCtx::Product(sel);
+                    Ok(())
+                } else {
+                    ascend(menu)?;
+                    descend(menu, Dir1D::Backward)
+                }
+            }
+            MenuCtx::Tup(mut sel) => {
+                sel.after.push((menu.tree.clone(), menu.tree_typ.clone()));
+                sel.after.rotate_left(1);
+                if sel.before.len() > 0 {
+                    let (tree, tree_typ) = sel.before.pop().unwrap();
+                    menu.tree = tree;
+                    menu.tree_typ = tree_typ;
+                    menu.ctx = MenuCtx::Tup(sel);
                     Ok(())
                 } else {
                     ascend(menu)?;
@@ -593,6 +674,7 @@ pub mod semantics {
         } else {
             match typ {
                 &MenuType::Prim(PrimType::Unit) => MenuTree::Unit,
+                &MenuType::Prim(PrimType::Null) => MenuTree::Null,
                 &MenuType::Prim(PrimType::Nat) => MenuTree::Nat(0),
                 &MenuType::Prim(PrimType::Text) => MenuTree::Text("".to_string()),
                 &MenuType::Prim(PrimType::Bool) => MenuTree::Bool(false),
@@ -671,6 +753,9 @@ pub mod io {
 
                 ("ArrowUp", Tag::Product, _) => Ok(vec![EditCommand::PrevSibling]),
                 ("ArrowDown", Tag::Product, _) => Ok(vec![EditCommand::NextSibling]),
+
+                ("ArrowUp", Tag::Tup, _) => Ok(vec![EditCommand::PrevSibling]),
+                ("ArrowDown", Tag::Tup, _) => Ok(vec![EditCommand::NextSibling]),
 
                 (key, ctx, tree) => {
                     warn!(
@@ -887,6 +972,29 @@ pub mod io {
                     r_out.end();
                     return;
                 }
+                &MenuCtx::Tup(ref sel) => {
+                    next_ctx = Some(sel.ctx.clone());
+                    r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+                    for (t, _ty) in sel.before.iter() {
+                        begin_item(&mut r);
+                        //render_product_label(l, &mut r);
+                        render_tree(t, false, &ctx_box_fill(), &mut r);
+                        r.end();
+                    }
+                    {
+                        begin_item(&mut r);
+                        //render_product_label(&sel.label, &mut r);
+                        r.nest(&Name::Void, r_tree);
+                        r.end();
+                    }
+                    for (t, _ty) in sel.after.iter() {
+                        begin_item(&mut r);
+                        //render_product_label(&l, &mut r);
+                        render_tree(t, false, &ctx_box_fill(), &mut r);
+                        r.end();
+                    }
+                    r.end();
+                }
                 &MenuCtx::Product(ref sel) => {
                     next_ctx = Some(sel.ctx.clone());
                     r.begin(&Name::Void, FrameType::Flow(vert_flow()));
@@ -919,7 +1027,6 @@ pub mod io {
                 }
                 &MenuCtx::Option(_flag, ref _body) => unimplemented!(),
                 &MenuCtx::Vec(ref _ch) => unimplemented!(),
-                &MenuCtx::Tup(ref _ch) => unimplemented!(),
             };
             r.end();
             // continue rendering the rest of the context, in whatever flow we are using for that purpose.
@@ -943,6 +1050,7 @@ pub mod io {
             let mut first = true;
             match typ {
                 MenuType::Prim(PrimType::Unit) => r.str("()", text),
+                MenuType::Prim(PrimType::Null) => r.str("null", text),
                 MenuType::Prim(PrimType::Nat) => r.str("nat", text),
                 MenuType::Prim(PrimType::Text) => r.str("text", text),
                 MenuType::Prim(PrimType::Bool) => r.str("bool", text),
@@ -1147,6 +1255,7 @@ pub mod io {
                 &MenuTree::Bool(b) => r.text(&format!("{}", b), &text_atts()),
                 &MenuTree::Text(ref t) => r.text(&format!("{:?}", t), &text_atts()),
                 &MenuTree::Unit => r.str("()", &text_atts()),
+                &MenuTree::Null => r.str("null", &text_atts()),
             };
             r.end();
         };
@@ -1238,7 +1347,8 @@ impl fmt::Display for MenuTree {
             MenuTree::Nat(n) => write!(f, "{}", n),
             MenuTree::Text(t) => write!(f, "{:?}", t),
             MenuTree::Bool(b) => write!(f, "{}", b),
-            MenuTree::Unit => write!(f, ""),
+            MenuTree::Unit => write!(f, "()"),
+            MenuTree::Null => write!(f, "null"),
         }
     }
 }
@@ -1274,6 +1384,7 @@ impl fmt::Display for MenuType {
         match self {
             MenuType::Var(ref n) => write!(f, "{:?}", n),
             MenuType::Prim(PrimType::Unit) => write!(f, "()"),
+            MenuType::Prim(PrimType::Null) => write!(f, "null"),
             MenuType::Prim(PrimType::Nat) => write!(f, "nat"),
             MenuType::Prim(PrimType::Text) => write!(f, "text"),
             MenuType::Prim(PrimType::Bool) => write!(f, "bool"),

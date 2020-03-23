@@ -9,7 +9,7 @@ use ic_http_agent::{Agent, AgentConfig, Blob, CanisterId};
 use serde_idl::grammar::IDLProgParser;
 use serde_idl::lexer::Lexer;
 use serde_idl::{
-    types::{Dec, IDLProg, IDLType, Label},
+    types::{Dec, IDLProg, IDLType, Label, PrimType},
     value::IDLArgs,
 };
 
@@ -71,9 +71,11 @@ fn menutype_of_idltype(env: &Env, t: &IDLType) -> MenuType {
                 .collect();
             MenuType::Func(menu::FuncType { args, rets })
         }
-        IDLType::PrimT(Nat) => MenuType::Prim(menu::PrimType::Nat),
-        IDLType::PrimT(Text) => MenuType::Prim(menu::PrimType::Text),
-        IDLType::PrimT(Bool) => MenuType::Prim(menu::PrimType::Bool),
+        IDLType::PrimT(PrimType::Nat) => MenuType::Prim(menu::PrimType::Nat),
+        IDLType::PrimT(PrimType::Nat8) => MenuType::Prim(menu::PrimType::Nat),
+        IDLType::PrimT(PrimType::Text) => MenuType::Prim(menu::PrimType::Text),
+        IDLType::PrimT(PrimType::Bool) => MenuType::Prim(menu::PrimType::Bool),
+        IDLType::PrimT(PrimType::Null) => MenuType::Prim(menu::PrimType::Null),
         _ => unimplemented!("{:?}", t),
     }
 }
@@ -104,6 +106,11 @@ pub fn menutype_resolve_var(env: &Env, v: &String, depth: usize) -> MenuType {
     }
 }
 
+pub fn tuple_of_product(t: &menu::MenuTree) -> menu::MenuTree {
+    // to do
+    t.clone()
+}
+
 pub fn menutype_of_idlprog(p: &IDLProg) -> menu::MenuType {
     let mut emp = HashMap::new();
     let mut env = HashMap::new();
@@ -125,7 +132,7 @@ pub fn menutype_of_idlprog(p: &IDLProg) -> menu::MenuType {
                 let i = method.id.clone();
                 let t = match method.typ {
                     IDLType::FuncT(ref ft) => {
-                        if ft.args.len() > 1 {
+                        if ft.args.len() > 0 {
                             let arg_types: Vec<MenuType> = ft
                                 .args
                                 .iter()
@@ -133,16 +140,10 @@ pub fn menutype_of_idlprog(p: &IDLProg) -> menu::MenuType {
                                 .collect();
                             let mut fields = vec![];
                             for i in 0..arg_types.len() {
-                                fields.push((
-                                    Name::Atom(Atom::Usize(fields.len())),
-                                    arg_types[i].clone(),
-                                ))
+                                fields.push(arg_types[i].clone())
                             }
-                            MenuType::Product(fields)
-                        } else if ft.args.len() == 1 {
-                            menutype_of_idltype(&env, &ft.args[0])
+                            MenuType::Tup(fields)
                         } else {
-                            assert_eq!(ft.args.len(), 0);
                             MenuType::Prim(menu::PrimType::Unit)
                         }
                     }

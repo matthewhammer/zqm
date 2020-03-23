@@ -67,8 +67,6 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
             command_eval(state, &resume)
         }
     } else if let &Command::Resume(Media::MenuTree(ref mt), ref old_frame) = command {
-        debug!("command_eval: resume, with menu tree...");
-
         // to do: clean, refactor and move this logic (e.g., into the candid module)
         match &**mt {
             &menu::MenuTree::Variant(ref ch) => match &ch.choice {
@@ -77,68 +75,72 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                 }
                 &Some((ref lab, ref tree, ref typ)) => {
                     let method = format!("{}", lab);
-                    let str = format!("({})", tree);
+                    let str = format!("{}", tree);
                     info!("Sending message \"{}\", with args {}", method, str);
-                    let args = &str.parse::<IDLArgs>().unwrap();
-                    debug!("...as {}({})", method, args);
+                    if let Ok(args) = &str.parse::<IDLArgs>() {
+                        debug!("...as {}({})", method, args);
 
-                    if let &mut Editor::CandidRepl(ref mut repl) = &mut state.frame.editor {
-                        use ic_http_agent::{Blob, CanisterId, Waiter};
-                        use std::time::Duration;
-                        use tokio::runtime::Runtime;
+                        if let &mut Editor::CandidRepl(ref mut repl) = &mut state.frame.editor {
+                            use ic_http_agent::{Blob, CanisterId, Waiter};
+                            use std::time::Duration;
+                            use tokio::runtime::Runtime;
 
-                        info!(
-                            "...to canister_id {:?} at replica_url {:?}",
-                            repl.config.canister_id, repl.config.replica_url
-                        );
+                            info!(
+                                "...to canister_id {:?} at replica_url {:?}",
+                                repl.config.canister_id, repl.config.replica_url
+                            );
 
-                        let mut runtime = Runtime::new().expect("Unable to create a runtime");
-                        let waiter = Waiter::builder()
-                            .throttle(Duration::from_millis(100))
-                            .timeout(Duration::from_secs(60))
-                            .build();
-                        let agent = candid::agent(&repl.config.replica_url).unwrap();
-                        let canister_id =
-                            CanisterId::from_text(repl.config.canister_id.clone()).unwrap();
-                        let timestamp = std::time::SystemTime::now();
-                        let blob_res = runtime.block_on(agent.call_and_wait(
-                            &canister_id,
-                            &method,
-                            &Blob(args.to_bytes().unwrap()),
-                            waiter,
-                        ));
+                            let mut runtime = Runtime::new().expect("Unable to create a runtime");
+                            let waiter = Waiter::builder()
+                                .throttle(Duration::from_millis(100))
+                                .timeout(Duration::from_secs(60))
+                                .build();
+                            let agent = candid::agent(&repl.config.replica_url).unwrap();
+                            let canister_id =
+                                CanisterId::from_text(repl.config.canister_id.clone()).unwrap();
+                            let timestamp = std::time::SystemTime::now();
+                            let blob_res = runtime.block_on(agent.call_and_wait(
+                                &canister_id,
+                                &method,
+                                &Blob(args.to_bytes().unwrap()),
+                                waiter,
+                            ));
 
-                        let elapsed = timestamp.elapsed().unwrap();
-                        if let Ok(blob_res) = blob_res {
-                            let result = serde_idl::IDLArgs::from_bytes(&(*blob_res.unwrap().0));
-                            let res = format!("{:?}", result.unwrap().args);
-                            info!("..successful result {:?}", res);
-                            let call = candid::Call {
-                                timestamp: timestamp,
-                                duration: elapsed,
-                                method: method,
-                                args: tree.clone(),
-                                args_idl: str.to_string(),
-                                rets_idl: Ok(res),
-                                rets: Err("<to do>".to_string()),
-                            };
-                            repl.history.push(call)
+                            let elapsed = timestamp.elapsed().unwrap();
+                            if let Ok(blob_res) = blob_res {
+                                let result =
+                                    serde_idl::IDLArgs::from_bytes(&(*blob_res.unwrap().0));
+                                let res = format!("{:?}", result.unwrap().args);
+                                info!("..successful result {:?}", res);
+                                let call = candid::Call {
+                                    timestamp: timestamp,
+                                    duration: elapsed,
+                                    method: method,
+                                    args: tree.clone(),
+                                    args_idl: str.to_string(),
+                                    rets_idl: Ok(res),
+                                    rets: Err("<to do>".to_string()),
+                                };
+                                repl.history.push(call)
+                            } else {
+                                let res = format!("{:?}", blob_res);
+                                info!("..error result {:?}", res);
+                                let call = candid::Call {
+                                    timestamp: timestamp,
+                                    duration: elapsed,
+                                    method: method,
+                                    args: tree.clone(),
+                                    args_idl: str.to_string(),
+                                    rets_idl: Err(res),
+                                    rets: Err("<to do>".to_string()),
+                                };
+                                repl.history.push(call)
+                            }
                         } else {
-                            let res = format!("{:?}", blob_res);
-                            info!("..error result {:?}", res);
-                            let call = candid::Call {
-                                timestamp: timestamp,
-                                duration: elapsed,
-                                method: method,
-                                args: tree.clone(),
-                                args_idl: str.to_string(),
-                                rets_idl: Err(res),
-                                rets: Err("<to do>".to_string()),
-                            };
-                            repl.history.push(call)
+                            unreachable!()
                         }
                     } else {
-                        unreachable!()
+                        error!("Cannot send incomplete message; please fill remaining blanks.")
                     }
                 }
             },
