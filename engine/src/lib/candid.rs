@@ -72,6 +72,7 @@ fn menutype_of_idltype(env: &Env, t: &IDLType) -> MenuType {
             MenuType::Func(menu::FuncType { args, rets })
         }
         IDLType::PrimT(PrimType::Nat) => MenuType::Prim(menu::PrimType::Nat),
+        IDLType::PrimT(PrimType::Int) => MenuType::Prim(menu::PrimType::Int),
         IDLType::PrimT(PrimType::Nat8) => MenuType::Prim(menu::PrimType::Nat),
         IDLType::PrimT(PrimType::Text) => MenuType::Prim(menu::PrimType::Text),
         IDLType::PrimT(PrimType::Bool) => MenuType::Prim(menu::PrimType::Bool),

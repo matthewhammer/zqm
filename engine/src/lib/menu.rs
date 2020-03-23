@@ -4,6 +4,7 @@ use types::lang::{Atom, Dir1D, Name};
 
 pub type Text = String;
 pub type Nat = usize; // todo -- use a bignum rep
+pub type Int = isize; // todo -- use a bignum rep
 pub type Label = Name;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -23,6 +24,7 @@ pub enum PrimType {
     Null,
     Unit,
     Nat,
+    Int,
     Text,
     Bool,
 }
@@ -42,6 +44,7 @@ pub enum MenuTree {
     Tup(Vec<(MenuTree, MenuType)>),
     Blank(MenuType),
     Nat(Nat),
+    Int(Int),
     Text(Text),
     Bool(bool),
     Unit,
@@ -245,6 +248,7 @@ pub mod semantics {
             MenuTree::Tup(_) => Tag::Tup,
             MenuTree::Blank(_) => Tag::Blank,
             MenuTree::Nat(_) => Tag::Prim(PrimType::Nat),
+            MenuTree::Int(_) => Tag::Prim(PrimType::Int),
             MenuTree::Bool(_) => Tag::Prim(PrimType::Bool),
             MenuTree::Text(_) => Tag::Prim(PrimType::Text),
             MenuTree::Unit => Tag::Prim(PrimType::Unit),
@@ -676,6 +680,7 @@ pub mod semantics {
                 &MenuType::Prim(PrimType::Unit) => MenuTree::Unit,
                 &MenuType::Prim(PrimType::Null) => MenuTree::Null,
                 &MenuType::Prim(PrimType::Nat) => MenuTree::Nat(0),
+                &MenuType::Prim(PrimType::Int) => MenuTree::Int(0),
                 &MenuType::Prim(PrimType::Text) => MenuTree::Text("".to_string()),
                 &MenuType::Prim(PrimType::Bool) => MenuTree::Bool(false),
                 &MenuType::Var(ref n) => MenuTree::Blank(typ.clone()),
@@ -1052,6 +1057,7 @@ pub mod io {
                 MenuType::Prim(PrimType::Unit) => r.str("()", text),
                 MenuType::Prim(PrimType::Null) => r.str("null", text),
                 MenuType::Prim(PrimType::Nat) => r.str("nat", text),
+                MenuType::Prim(PrimType::Int) => r.str("int", text),
                 MenuType::Prim(PrimType::Text) => r.str("text", text),
                 MenuType::Prim(PrimType::Bool) => r.str("bool", text),
                 MenuType::Variant(fields) => {
@@ -1252,6 +1258,7 @@ pub mod io {
                 }
                 &MenuTree::Blank(ref _typ) => r.text(&format!("___"), &blank_atts()),
                 &MenuTree::Nat(n) => r.text(&format!("{}", n), &text_atts()),
+                &MenuTree::Int(i) => r.text(&format!("{}", i), &text_atts()),
                 &MenuTree::Bool(b) => r.text(&format!("{}", b), &text_atts()),
                 &MenuTree::Text(ref t) => r.text(&format!("{:?}", t), &text_atts()),
                 &MenuTree::Unit => r.str("()", &text_atts()),
@@ -1345,6 +1352,7 @@ impl fmt::Display for MenuTree {
             }
             MenuTree::Blank(_) => write!(f, "variant {{BLANK=()}}"),
             MenuTree::Nat(n) => write!(f, "{}", n),
+            MenuTree::Int(i) => write!(f, "{}", i),
             MenuTree::Text(t) => write!(f, "{:?}", t),
             MenuTree::Bool(b) => write!(f, "{}", b),
             MenuTree::Unit => write!(f, "()"),
@@ -1386,6 +1394,7 @@ impl fmt::Display for MenuType {
             MenuType::Prim(PrimType::Unit) => write!(f, "()"),
             MenuType::Prim(PrimType::Null) => write!(f, "null"),
             MenuType::Prim(PrimType::Nat) => write!(f, "nat"),
+            MenuType::Prim(PrimType::Int) => write!(f, "int"),
             MenuType::Prim(PrimType::Text) => write!(f, "text"),
             MenuType::Prim(PrimType::Bool) => write!(f, "bool"),
             MenuType::Variant(fields) => {
