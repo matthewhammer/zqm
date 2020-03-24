@@ -160,6 +160,11 @@ impl Render {
         self.end();
     }
 
+    pub fn add(&mut self, elms: Elms) {
+        let mut elms = elms;
+        self.frame.elms.append(&mut elms)
+    }
+
     pub fn into_elms(self) -> Elms {
         assert_eq!(self.stack.len(), 0);
         self.frame.elms

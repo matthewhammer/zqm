@@ -3,7 +3,10 @@ extern crate serde_idl;
 
 use menu;
 use menu::MenuType;
-use types::lang::{Atom, Name};
+use types::{
+    lang::{Atom, Name},
+    render,
+};
 
 use ic_http_agent::{Agent, AgentConfig, Blob, CanisterId};
 use serde_idl::grammar::IDLProgParser;
@@ -11,6 +14,8 @@ use serde_idl::lexer::Lexer;
 use serde_idl::{
     types::{Dec, IDLProg, IDLType, Label, PrimType},
     value::IDLArgs,
+    value::IDLField,
+    value::IDLValue,
 };
 
 use std::collections::HashMap;
@@ -79,6 +84,192 @@ fn menutype_of_idltype(env: &Env, t: &IDLType) -> MenuType {
         IDLType::PrimT(PrimType::Null) => MenuType::Prim(menu::PrimType::Null),
         _ => unimplemented!("{:?}", t),
     }
+}
+
+pub fn string_of_field_id(id: u32) -> Option<String> {
+    match id {
+        24860 => Some("ok".to_string()),
+        1269255460 => Some("rect".to_string()),
+        4996424 => Some("dim".to_string()),
+        5594516 => Some("pos".to_string()),
+        38537191 => Some("height".to_string()),
+        3395466758 => Some("width".to_string()),
+        120 => Some("x".to_string()),
+        121 => Some("y".to_string()),
+        240232876 => Some("closed".to_string()),
+        _ => None,
+    }
+}
+
+pub fn get_nat(n: &IDLValue) -> Option<usize> {
+    match n {
+        IDLValue::Nat(n) => Some(*n as usize),
+        _ => None,
+    }
+}
+pub fn get_pos(pos: &IDLValue) -> Option<render::Pos> {
+    match pos {
+        IDLValue::Record(fields) => match (get_nat(&fields[0].val), get_nat(&fields[1].val)) {
+            (Some(x), Some(y)) => {
+                let x = x as isize;
+                let y = y as isize;
+                Some(render::Pos { x, y })
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+pub fn get_dim(dim: &IDLValue) -> Option<render::Dim> {
+    match dim {
+        IDLValue::Record(fields) => match (get_nat(&fields[0].val), get_nat(&fields[1].val)) {
+            (Some(width), Some(height)) => Some(render::Dim { width, height }),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+pub fn get_rect(rect: &IDLValue) -> Option<render::Rect> {
+    match rect {
+        IDLValue::Record(fields) => {
+            if fields.len() != 2 {
+                return None;
+            };
+            match (get_pos(&fields[1].val), get_dim(&fields[0].val)) {
+                (Some(pos), Some(dim)) => Some(render::Rect { pos, dim }),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+pub fn get_color(color: &IDLValue) -> Option<render::Color> {
+    match color {
+        IDLValue::Record(fields) => {
+            if fields.len() != 3 {
+                return None;
+            };
+            match (
+                get_nat(&fields[0].val),
+                get_nat(&fields[1].val),
+                get_nat(&fields[2].val),
+            ) {
+                (Some(r), Some(g), Some(b)) => Some(render::Color::RGB(r, g, b)),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+pub fn get_fill_(fill: &IDLField) -> Option<render::Fill> {
+    match fill.id {
+        // #closed : Color
+        240232876 => match get_color(&fill.val) {
+            Some(c) => Some(Fill::Closed(c)),
+            None => None,
+        },
+        _ => None,
+    }
+}
+
+pub fn get_fill(fill: &IDLValue) -> Option<render::Fill> {
+    match fill {
+        IDLValue::Variant(v) => get_fill_(&*v),
+        _ => None,
+    }
+}
+
+pub fn render_rect_fill(elm: &IDLValue) -> Option<render::Elm> {
+    match elm {
+        IDLValue::Record(fields) => {
+            if fields.len() != 2 {
+                return None;
+            };
+            match (get_rect(&fields[0].val), get_fill(&fields[1].val)) {
+                (Some(r), Some(f)) => Some(render::Elm::Rect(r, f)),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+pub fn render_elm(elm: &IDLField) -> Option<render::Elm> {
+    info!("render_elm");
+    match elm.id {
+        // #rect : (Rect, Fill)
+        1269255460 => render_rect_fill(&elm.val),
+        _ => {
+            info!("warning: recognized element {:?}", elm);
+            None
+        }
+    }
+}
+
+pub fn render_ok(elms: &IDLValue) -> Option<render::Elms> {
+    info!("render_ok");
+    match elms {
+        IDLValue::Vec(vals) => {
+            let mut out: render::Elms = vec![];
+            for v in vals {
+                match v {
+                    IDLValue::Variant(elm) => match render_elm(elm) {
+                        None => {
+                            warn!("unrecognized element {:?}", v);
+                            return None;
+                        }
+                        Some(elm) => out.push(elm),
+                    },
+                    _ => {
+                        warn!("unrecognized element {:?}", v);
+                        return None;
+                    }
+                }
+            }
+            Some(out)
+        }
+        _ => {
+            warn!("expected Vec, not {:?}", elms);
+            None
+        }
+    }
+}
+
+pub fn render_err(ret: &IDLValue) -> Option<render::Elms> {
+    None
+}
+
+pub fn render_result(ret: &IDLValue) -> Option<render::Elms> {
+    match ret {
+        IDLValue::Variant(f) => {
+            match f.id {
+                24860 => render_ok(&f.val),
+                666 => render_err(&f.val), // to do
+                _ => {
+                    warn!("unexpected field {:?}", f);
+                    None
+                }
+            }
+        }
+        IDLValue::Record(fs) => None,
+        _ => None,
+    }
+}
+
+pub fn render_of_rets(rets: &Vec<IDLValue>) -> Option<render::Elms> {
+    trace!("{:?}", rets);
+    let mut out: render::Elms = vec![];
+    for res in rets.iter() {
+        match render_result(res) {
+            None => return None,
+            Some(mut x) => out.append(&mut x),
+        }
+    }
+    Some(out)
 }
 
 pub fn idlargs_of_menutree(mt: &menu::MenuTree) -> String {
@@ -173,7 +364,7 @@ pub struct Call {
     pub args: menu::MenuTree,
     pub args_idl: String,
     pub rets_idl: Result<String, String>,
-    pub rets: Result<menu::MenuTree, String>,
+    pub rets_render: Option<render::Elms>,
     pub timestamp: SystemTime,
     pub duration: Duration,
 }
@@ -338,7 +529,13 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
                     r.begin(&Name::Void, FrameType::Flow(horz_flow()));
                     r.text(&format!(" {:?}", &call.duration), &dim_atts());
                     r.str("━━►", &dim2_atts());
-                    r.text(rets_idl, &data_atts());
+                    // to do -- if len of text overflows, then wrap it
+                    match call.rets_render {
+                        None => {
+                            r.text(rets_idl, &data_atts());
+                        }
+                        Some(ref elms) => r.add(elms.clone()),
+                    };
                     r.end()
                 }
                 Err(ref msg) => {
@@ -349,6 +546,7 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
                     r.end();
                     r.begin(&Name::Void, FrameType::Flow(horz_flow()));
                     r.str(&" ", &err_atts());
+                    // to do -- if len of text overflows, then wrap it
                     r.text(msg, &err_atts());
                     r.end();
                     r.end();

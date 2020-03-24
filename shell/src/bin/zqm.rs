@@ -15,6 +15,7 @@ extern crate structopt;
 use structopt::StructOpt;
 
 use sdl2::event::Event as SysEvent;
+use sdl2::event::WindowEvent;
 use sdl2::keyboard::Keycode;
 use std::io;
 
@@ -155,6 +156,16 @@ pub fn draw_elms<T: RenderTarget>(
 
 fn translate_system_event(event: SysEvent) -> Option<event::Event> {
     match &event {
+        SysEvent::Window {
+            win_event: WindowEvent::SizeChanged(w, h),
+            ..
+        } => {
+            let dim = render::Dim {
+                width: *w as usize,
+                height: *h as usize,
+            };
+            Some(event::Event::WindowSizeChange(dim))
+        }
         SysEvent::Quit { .. }
         | SysEvent::KeyDown {
             keycode: Some(Keycode::Escape),
@@ -189,22 +200,32 @@ fn translate_system_event(event: SysEvent) -> Option<event::Event> {
     }
 }
 
+pub fn redraw<T: RenderTarget>(
+    canvas: &mut Canvas<T>,
+    state: &mut types::lang::State,
+    dim: &render::Dim,
+) -> Result<(), String> {
+    let pos = render::Pos { x: 0, y: 0 };
+    let fill = render::Fill::Closed(render::Color::RGB(0, 0, 0));
+    let elms = eval::render_elms(state)?;
+    draw_elms(canvas, &pos, dim, &fill, &elms)?;
+    canvas.present();
+    drop(elms);
+    Ok(())
+}
+
 pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     use sdl2::event::EventType;
-
-    let pos = render::Pos { x: 0, y: 0 };
-    let dim = render::Dim {
-        width: 888,
+    let mut dim = render::Dim {
+        width: 1000,
         height: 666,
     };
-    let fill = render::Fill::Closed(render::Color::RGB(0, 0, 0));
-
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let window = video_subsystem
-        .window("zoom-quilt-machine", dim.width as u32, dim.height as u32)
+        .window("thin-ic-agent", dim.width as u32, dim.height as u32)
         .position_centered()
-        //.resizable()
+        .resizable()
         //.input_grabbed()
         //.fullscreen()
         //.fullscreen_desktop()
@@ -221,10 +242,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
 
     {
         // draw initial frame, before waiting for any events
-        let elms = eval::render_elms(state)?;
-        draw_elms(&mut canvas, &pos, &dim, &fill, &elms)?;
-        canvas.present();
-        drop(elms);
+        redraw(&mut canvas, state, &dim);
     }
 
     let mut event_pump = sdl_context.event_pump()?;
@@ -240,6 +258,15 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
             None => continue 'running,
             Some(event) => event,
         };
+        // catch window resize event: redraw and loop:
+        match event {
+            event::Event::WindowSizeChange(new_dim) => {
+                dim = new_dim.clone();
+                redraw(&mut canvas, state, &dim)?;
+                continue 'running;
+            }
+            _ => (),
+        }
         match eval::commands_of_event(state, &event) {
             Ok(commands) => {
                 for c in commands.iter() {
@@ -253,10 +280,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
                         }
                     }
                 }
-                let elms = eval::render_elms(state)?;
-                draw_elms(&mut canvas, &pos, &dim, &fill, &elms)?;
-                canvas.present();
-                drop(elms);
+                redraw(&mut canvas, state, &dim)?;
             }
             Err(()) => break 'running,
         }

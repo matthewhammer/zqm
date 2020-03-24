@@ -345,6 +345,7 @@ pub mod event {
         Quit,
         KeyDown(KeyEventInfo),
         KeyUp(KeyEventInfo),
+        WindowSizeChange(super::render::Dim),
     }
     #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
     pub struct KeyEventInfo {

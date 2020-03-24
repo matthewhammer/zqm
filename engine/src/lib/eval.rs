@@ -110,7 +110,9 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                             if let Ok(blob_res) = blob_res {
                                 let result =
                                     serde_idl::IDLArgs::from_bytes(&(*blob_res.unwrap().0));
-                                let res = format!("{:?}", result.unwrap().args);
+                                let idl_rets = result.unwrap().args;
+                                let rets_render = candid::render_of_rets(&idl_rets);
+                                let res = format!("{:?}", &idl_rets);
                                 info!("..successful result {:?}", res);
                                 let call = candid::Call {
                                     timestamp: timestamp,
@@ -119,7 +121,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                                     args: tree.clone(),
                                     args_idl: str.to_string(),
                                     rets_idl: Ok(res),
-                                    rets: Err("<to do>".to_string()),
+                                    rets_render,
                                 };
                                 repl.history.push(call)
                             } else {
@@ -132,7 +134,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                                     args: tree.clone(),
                                     args_idl: str.to_string(),
                                     rets_idl: Err(res),
-                                    rets: Err("<to do>".to_string()),
+                                    rets_render: None,
                                 };
                                 repl.history.push(call)
                             }
