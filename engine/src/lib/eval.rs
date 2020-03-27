@@ -116,6 +116,7 @@ pub fn command_eval(
                                     serde_idl::IDLArgs::from_bytes(&(*blob_res.unwrap().0));
                                 let idl_rets = result.unwrap().args;
                                 let render_out = candid::find_render_out(&idl_rets);
+                                repl.update_display(&render_out);
                                 let res = format!("{:?}", &idl_rets);
                                 let mut res_log = res.clone();
                                 if res_log.len() > 80 {

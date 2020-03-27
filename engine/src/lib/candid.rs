@@ -573,8 +573,34 @@ pub struct Call {
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Repl {
     pub config: Config,
+    pub display: Vec<(Name, render::Elm)>,
     pub history: Vec<Call>,
     // todo: log of results, parsed into MenuTree's according to the MenuType of the result type
+}
+
+impl Repl {
+    pub fn update_display(&mut self, out: &Option<render::Out>) {
+        match out {
+            None => (), // nothing
+            Some(render::Out::Draw(named_elms)) => {
+                // nothing
+            }
+            Some(render::Out::Redraw(named_elms)) => {
+                let mut cells = std::collections::HashMap::new();
+                for (name, elm) in self.display.iter() {
+                    cells.insert(name, elm);
+                }
+                for (name, elm) in named_elms.iter() {
+                    cells.insert(name, elm);
+                }
+                let mut display: render::NamedElms = vec![];
+                for (name, elm) in cells.drain().take(1) {
+                    display.push((name.clone(), elm.clone()))
+                }
+                self.display = display;
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -594,6 +620,7 @@ pub fn init(url: &str, cid_text: &str, p: &IDLProg) -> Result<State, String> {
     let mut st = State {
         stack: vec![Frame::from_editor(Editor::CandidRepl(Box::new(Repl {
             history: vec![],
+            display: vec![],
             config: Config {
                 //idl_prog: p.clone(),
                 menu_type: mt.clone(),
@@ -736,6 +763,21 @@ fn box_fill() -> Fill {
 }
 
 pub fn render_elms(repl: &Repl, r: &mut Render) {
+    if repl.display.len() > 0 {
+        r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+        r.str("Render cells:", &msg_atts());
+        for (name, elm) in repl.display.iter() {
+            r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+            r.fill(Fill::Open(Color::RGB(255, 255, 255), 1));
+            r.begin(&Name::Void, FrameType::Flow(horz_flow()));
+            r.name(name, &data_atts());
+            r.str("= ", &data_atts());
+            r.end();
+            r.elm(elm.clone());
+            r.end();
+        }
+        r.end()
+    }
     if repl.history.len() > 0 {
         r.begin(&Name::Void, FrameType::Flow(vert_flow()));
         r.str("Message log:", &msg_atts());
