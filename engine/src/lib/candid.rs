@@ -783,7 +783,7 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
         r.str("Message log:", &msg_atts());
         r.begin(&Name::Void, FrameType::Flow(vert_flow()));
         r.fill(box_fill());
-        for call in repl.history.iter() {
+        for call in repl.history.iter().rev().take(10) {
             r.begin(&Name::Void, FrameType::Flow(vert_flow()));
             r.begin(&Name::Void, FrameType::Flow(horz_flow()));
             r.str(&call.method, &msg_atts());
