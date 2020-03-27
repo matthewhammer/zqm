@@ -99,6 +99,10 @@ impl Render {
         self.frame.elms.push(Elm::Rect(r.clone(), f))
     }
 
+    pub fn elm(&mut self, e: Elm) {
+        self.frame.elms.push(e)
+    }
+
     pub fn bitmap(&mut self, bm: &bitmap::Bitmap, ba: &BitmapAtts) {
         let (width, height) = bitmap::semantics::bitmap_get_size(bm);
         for y in 0..height {

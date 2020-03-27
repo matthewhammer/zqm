@@ -411,6 +411,13 @@ pub mod render {
         Node(Box<Node>),
     }
     pub type Elms = Vec<Elm>;
+    pub type NamedElms = Vec<(Name, Elm)>;
+
+    #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+    pub enum Out {
+        Draw(Elm),
+        Redraw(NamedElms),
+    }
 }
 
 /// Deprecated?

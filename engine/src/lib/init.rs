@@ -127,7 +127,7 @@ service server : {
             )
         }
     };
-    let r = eval::command_eval(&mut state_init, &init_command);
+    let r = eval::command_eval(&mut state_init, None, &init_command);
     match r {
         Ok(()) => {}
         Err(err) => eprintln!("Failed to initialize the editor: {:?}", err),

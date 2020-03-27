@@ -107,6 +107,14 @@ pub fn get_nat(n: &IDLValue) -> Option<usize> {
         _ => None,
     }
 }
+
+pub fn get_text(n: &IDLValue) -> Option<String> {
+    match n {
+        IDLValue::Text(t) => Some(t.clone()),
+        _ => None,
+    }
+}
+
 pub fn get_pos(pos: &IDLValue) -> Option<render::Pos> {
     match pos {
         IDLValue::Record(fields) => match (get_nat(&fields[0].val), get_nat(&fields[1].val)) {
@@ -123,7 +131,7 @@ pub fn get_pos(pos: &IDLValue) -> Option<render::Pos> {
 
 pub fn get_dim(dim: &IDLValue) -> Option<render::Dim> {
     match dim {
-        IDLValue::Record(fields) => match (get_nat(&fields[0].val), get_nat(&fields[1].val)) {
+        IDLValue::Record(fields) => match (get_nat(&fields[1].val), get_nat(&fields[0].val)) {
             (Some(width), Some(height)) => Some(render::Dim { width, height }),
             _ => None,
         },
@@ -165,6 +173,21 @@ pub fn get_color(color: &IDLValue) -> Option<render::Color> {
     }
 }
 
+pub fn get_color_nat(color_nat: &IDLValue) -> Option<(render::Color, usize)> {
+    match color_nat {
+        IDLValue::Record(fields) => {
+            if fields.len() != 2 {
+                return None;
+            };
+            match (get_color(&fields[0].val), get_nat(&fields[1].val)) {
+                (Some(c), Some(n)) => Some((c, n)),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
 pub fn get_fill_(fill: &IDLField) -> Option<render::Fill> {
     match fill.id {
         // #closed : Color
@@ -172,7 +195,17 @@ pub fn get_fill_(fill: &IDLField) -> Option<render::Fill> {
             Some(c) => Some(Fill::Closed(c)),
             None => None,
         },
-        _ => None,
+        // #open : (Color, Nat)
+        1236534218 => match get_color_nat(&fill.val) {
+            Some((c, n)) => Some(Fill::Open(c, n)),
+            None => None,
+        },
+        // #none
+        1225396920 => Some(Fill::None),
+        _ => {
+            error!("unrecognized fill tag: {:?}", fill);
+            None
+        }
     }
 }
 
@@ -183,7 +216,27 @@ pub fn get_fill(fill: &IDLValue) -> Option<render::Fill> {
     }
 }
 
-pub fn render_rect_fill(elm: &IDLValue) -> Option<render::Elm> {
+pub fn get_render_text(elm: &IDLValue) -> Option<render::Elm> {
+    match elm {
+        IDLValue::Record(fields) => {
+            if fields.len() != 2 {
+                return None;
+            };
+            // to do -- decompose these text atts and use them!
+            match get_text(&fields[0].val) {
+                Some(t) => {
+                    let mut r = Render::new();
+                    r.text(&t, &big_msg_atts());
+                    Some(r.into_elms()[0].clone())
+                }
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+pub fn get_render_rect_fill(elm: &IDLValue) -> Option<render::Elm> {
     match elm {
         IDLValue::Record(fields) => {
             if fields.len() != 2 {
@@ -198,78 +251,226 @@ pub fn render_rect_fill(elm: &IDLValue) -> Option<render::Elm> {
     }
 }
 
-pub fn render_elm(elm: &IDLField) -> Option<render::Elm> {
-    info!("render_elm");
-    match elm.id {
-        // #rect : (Rect, Fill)
-        1269255460 => render_rect_fill(&elm.val),
-        _ => {
-            info!("warning: recognized element {:?}", elm);
-            None
-        }
-    }
-}
-
-pub fn render_ok(elms: &IDLValue) -> Option<render::Elms> {
-    info!("render_ok");
-    match elms {
-        IDLValue::Vec(vals) => {
-            let mut out: render::Elms = vec![];
-            for v in vals {
-                match v {
-                    IDLValue::Variant(elm) => match render_elm(elm) {
-                        None => {
-                            warn!("unrecognized element {:?}", v);
-                            return None;
-                        }
-                        Some(elm) => out.push(elm),
-                    },
-                    _ => {
-                        warn!("unrecognized element {:?}", v);
-                        return None;
+pub fn get_render_node(elm: &IDLValue) -> Option<render::Elm> {
+    match elm {
+        IDLValue::Record(fields) => {
+            if fields.len() != 3 {
+                return None;
+            };
+            let rect = get_rect(&fields[2].val);
+            let fill = get_fill(&fields[1].val);
+            // to do -- decompose these text atts and use them!
+            match &fields[0].val {
+                IDLValue::Vec(vals) => match (rect, fill, get_render_elms(&vals)) {
+                    (None, _, _) => {
+                        warn!("failed to parse rect of node elm");
+                        None
                     }
-                }
-            }
-            Some(out)
-        }
-        _ => {
-            warn!("expected Vec, not {:?}", elms);
-            None
-        }
-    }
-}
-
-pub fn render_err(ret: &IDLValue) -> Option<render::Elms> {
-    None
-}
-
-pub fn render_result(ret: &IDLValue) -> Option<render::Elms> {
-    match ret {
-        IDLValue::Variant(f) => {
-            match f.id {
-                24860 => render_ok(&f.val),
-                666 => render_err(&f.val), // to do
-                _ => {
-                    warn!("unexpected field {:?}", f);
-                    None
-                }
+                    (_, None, _) => {
+                        warn!("failed to parse fill of node elm");
+                        None
+                    }
+                    (Some(rect), Some(fill), Some(node_elms)) => {
+                        trace!("node with elements: {:?}", node_elms);
+                        Some(render::Elm::Node(Box::new(render::Node {
+                            name: Name::Void,
+                            children: node_elms,
+                            rect: rect,
+                            fill: fill,
+                        })))
+                    }
+                    _ => None,
+                },
+                _ => None,
             }
         }
-        IDLValue::Record(fs) => None,
         _ => None,
     }
 }
 
-pub fn render_of_rets(rets: &Vec<IDLValue>) -> Option<render::Elms> {
-    trace!("{:?}", rets);
+/*
+Variant(
+    // node
+    IDLField { id: 1225394690, val:
+               Record(
+                   [
+                       // elms
+                       IDLField {
+                           id: 1125441421, val:
+                           // elms vector
+                           Vec(
+                               [
+                                   // #rect
+                                   Variant(IDLField { id: 1269255460,
+                                                      // (rect, fill)
+                                                      val: Record([
+                                                          // 0: rect
+                                                          IDLField { id: 0, val: Record([
+                                                              IDLField { id: 4996424, val: Record([
+                                                                  IDLField { id: 38537191, val: Nat(10) },
+                                                                  IDLField { id: 3395466758, val: Nat(10) }]) },
+                                                              IDLField { id: 5594516, val: Record([
+                                                                  IDLField { id: 120, val: Nat(2) },
+                                                                  IDLField { id: 121, val: Nat(2) }]) }]) },
+                                                          // 1: fill
+                                                          IDLField { id: 1, val: Variant(
+                                                              IDLField { id: 240232876, val: Record([
+                                                                  IDLField { id: 0, val: Nat(0) },
+                                                                  IDLField { id: 1, val: Nat(0) },
+                                                                  IDLField { id: 2, val: Nat(0) }]) }) }
+                                                      ])
+                                   })
+                               ]
+                           )
+                       },
+                       // fill
+                       IDLField { id: 1136381571, val: Variant(IDLField { id: 1225396920, val: Null }) },
+                       // rect
+                       IDLField { id: 1269255460, val:
+                                  Record([
+                                      IDLField { id: 4996424, val: Record([
+                                          IDLField { id: 38537191, val: Nat(0) },
+                                          IDLField { id: 3395466758, val: Nat(0) }
+                                      ])
+                                      },
+                                      IDLField { id: 5594516, val: Record([
+                                          IDLField { id: 120, val: Nat(2) },
+                                          IDLField { id: 121, val: Nat(2) }]) }])
+                       }
+                   ]
+               )
+    })
+*/
+
+pub fn get_render_elm_(elm: &IDLField) -> Option<render::Elm> {
+    match elm.id {
+        // #node : Node
+        1225394690 => get_render_node(&elm.val),
+        // #text : (String, TextAtts)
+        1291439277 => get_render_text(&elm.val),
+        // #rect : (Rect, Fill)
+        1269255460 => get_render_rect_fill(&elm.val),
+        tag => {
+            info!(
+                "warning: recognized element tag {}, for element {:?}",
+                tag, elm
+            );
+            None
+        }
+    }
+}
+
+pub fn get_render_elm(v: &IDLValue) -> Option<render::Elm> {
+    // extra debugger messages here:
+    match v {
+        IDLValue::Variant(f) => match get_render_elm_(f) {
+            None => {
+                warn!("failed to parse element {:?}", v);
+                return None;
+            }
+            Some(elm) => Some(elm),
+        },
+        _ => {
+            warn!("unrecognized element {:?}", v);
+            return None;
+        }
+    }
+}
+
+pub fn get_render_elms(vals: &Vec<IDLValue>) -> Option<render::Elms> {
     let mut out: render::Elms = vec![];
-    for res in rets.iter() {
-        match render_result(res) {
+    for v in vals.iter() {
+        match get_render_elm(v) {
+            Some(elm) => out.push(elm),
             None => return None,
-            Some(mut x) => out.append(&mut x),
         }
     }
     Some(out)
+}
+
+pub fn get_render_named_elms_(vals: &Vec<IDLValue>) -> Option<render::NamedElms> {
+    let mut out: render::NamedElms = vec![];
+    for v in vals.iter() {
+        match v {
+            IDLValue::Record(fields) => {
+                if fields.len() != 2 {
+                    return None;
+                };
+                match (get_text(&fields[0].val), get_render_elm(&fields[1].val)) {
+                    (Some(name), Some(elm)) => out.push((Name::Atom(Atom::String(name)), elm)),
+                    _ => return None,
+                };
+            }
+            _ => return None,
+        }
+    }
+    Some(out)
+}
+
+pub fn get_render_named_elms(vals: &IDLValue) -> Option<render::NamedElms> {
+    match vals {
+        IDLValue::Vec(vals) => get_render_named_elms_(vals),
+        _ => None,
+    }
+}
+
+pub fn get_render_out(v: &IDLValue) -> Option<render::Out> {
+    match v {
+        IDLValue::Variant(field) => match field.id {
+            // #draw
+            1114647556 => match get_render_elm(&field.val) {
+                Some(elm) => Some(render::Out::Draw(elm)),
+                None => None,
+            },
+            // #redraw
+            4271367479 => match get_render_named_elms(&field.val) {
+                Some(named_elms) => Some(render::Out::Redraw(named_elms)),
+                None => None,
+            },
+            // #renderStreams -- to do
+            // otherwise
+            id => {
+                warn!("unexpected render_out id {:?}", id);
+                None
+            }
+        },
+        _ => None,
+    }
+}
+
+pub fn get_result_render_out(v: &IDLValue) -> Option<render::Out> {
+    // todo: add rendering for Ok/Err themselves
+    match v {
+        IDLValue::Variant(f) => match f.id {
+            // #ok
+            24860 => get_render_out(&f.val),
+            // #err
+            5048165 => get_render_out(&f.val),
+            _ => {
+                warn!("unexpected field {:?}", f);
+                None
+            }
+        },
+        _ => None,
+    }
+}
+
+pub fn find_render_out(vs: &Vec<IDLValue>) -> Option<render::Out> {
+    let mut outs: Vec<render::Out> = vec![];
+    for v in vs.iter() {
+        match get_result_render_out(v) {
+            None => {}
+            Some(o) => outs.push(o),
+        }
+    }
+    if outs.len() == 0 {
+        None
+    } else if outs.len() == 1 {
+        outs.pop()
+    } else {
+        error!("unexpected: multiple rendering outputs; using the last");
+        outs.pop()
+    }
 }
 
 pub fn idlargs_of_menutree(mt: &menu::MenuTree) -> String {
@@ -364,7 +565,7 @@ pub struct Call {
     pub args: menu::MenuTree,
     pub args_idl: String,
     pub rets_idl: Result<String, String>,
-    pub rets_render: Option<render::Elms>,
+    pub render_out: Option<render::Out>,
     pub timestamp: SystemTime,
     pub duration: Duration,
 }
@@ -409,7 +610,7 @@ pub fn init(url: &str, cid_text: &str, p: &IDLProg) -> Result<State, String> {
         menu::MenuTree::Blank(mt.clone()),
         mt,
     )));
-    eval::command_eval(&mut st, &cmd)?;
+    eval::command_eval(&mut st, None, &cmd)?;
     Ok(st)
 }
 
@@ -419,100 +620,122 @@ use types::{
     render::{Color, Dim, Elms, Fill},
 };
 
-pub fn render_elms(repl: &Repl, r: &mut Render) {
-    fn text_zoom() -> usize {
-        2
-    }
-    fn horz_flow() -> FlowAtts {
-        FlowAtts {
-            dir: Dir2D::Right,
-            intra_pad: 2,
-            inter_pad: 2,
-        }
-    }
-    fn vert_flow() -> FlowAtts {
-        FlowAtts {
-            dir: Dir2D::Down,
-            intra_pad: 2,
-            inter_pad: 2,
-        }
-    }
-    fn glyph_padding() -> usize {
-        1
-    }
-    // eventaually we get these atts from
-    //  some environment-determined settings
-    fn glyph_flow() -> FlowAtts {
-        FlowAtts {
-            dir: Dir2D::Right,
-            intra_pad: glyph_padding(),
-            inter_pad: glyph_padding(),
-        }
-    }
-    fn glyph_dim() -> Dim {
-        Dim {
-            width: 5,
-            height: 5,
-        }
-    }
-    fn kw_atts() -> TextAtts {
-        TextAtts {
-            zoom: text_zoom(),
-            fg_fill: Fill::Closed(Color::RGB(255, 230, 255)),
-            bg_fill: Fill::None,
-            glyph_dim: glyph_dim(),
-            glyph_flow: glyph_flow(),
-        }
-    }
-    fn dim_atts() -> TextAtts {
-        TextAtts {
-            zoom: text_zoom(),
-            fg_fill: Fill::Closed(Color::RGB(150, 100, 150)),
-            bg_fill: Fill::None,
-            glyph_dim: glyph_dim(),
-            glyph_flow: glyph_flow(),
-        }
-    }
-    fn dim2_atts() -> TextAtts {
-        TextAtts {
-            zoom: text_zoom(),
-            fg_fill: Fill::Closed(Color::RGB(200, 180, 200)),
-            bg_fill: Fill::None,
-            glyph_dim: glyph_dim(),
-            glyph_flow: glyph_flow(),
-        }
-    }
-    fn data_atts() -> TextAtts {
-        TextAtts {
-            zoom: text_zoom(),
-            fg_fill: Fill::Closed(Color::RGB(230, 230, 230)),
-            bg_fill: Fill::None,
-            glyph_dim: glyph_dim(),
-            glyph_flow: glyph_flow(),
-        }
-    };
-    fn err_atts() -> TextAtts {
-        TextAtts {
-            zoom: text_zoom(),
-            fg_fill: Fill::Closed(Color::RGB(255, 100, 100)),
-            bg_fill: Fill::None,
-            glyph_dim: glyph_dim(),
-            glyph_flow: glyph_flow(),
-        }
-    };
-    fn msg_atts() -> TextAtts {
-        TextAtts {
-            zoom: text_zoom(),
-            fg_fill: Fill::Closed(Color::RGB(200, 200, 255)),
-            bg_fill: Fill::None,
-            glyph_dim: glyph_dim(),
-            glyph_flow: glyph_flow(),
-        }
-    };
-    fn box_fill() -> Fill {
-        Fill::Open(Color::RGB(50, 100, 50), 1)
-    };
+fn text_zoom() -> usize {
+    2
+}
 
+fn horz_flow() -> FlowAtts {
+    FlowAtts {
+        dir: Dir2D::Right,
+        intra_pad: 2,
+        inter_pad: 2,
+    }
+}
+
+fn vert_flow() -> FlowAtts {
+    FlowAtts {
+        dir: Dir2D::Down,
+        intra_pad: 2,
+        inter_pad: 2,
+    }
+}
+
+fn glyph_padding() -> usize {
+    1
+}
+
+// eventaually we get these atts from
+//  some environment-determined settings
+fn glyph_flow() -> FlowAtts {
+    FlowAtts {
+        dir: Dir2D::Right,
+        intra_pad: glyph_padding(),
+        inter_pad: glyph_padding(),
+    }
+}
+
+fn glyph_dim() -> Dim {
+    Dim {
+        width: 5,
+        height: 5,
+    }
+}
+
+fn kw_atts() -> TextAtts {
+    TextAtts {
+        zoom: text_zoom(),
+        fg_fill: Fill::Closed(Color::RGB(255, 230, 255)),
+        bg_fill: Fill::None,
+        glyph_dim: glyph_dim(),
+        glyph_flow: glyph_flow(),
+    }
+}
+
+fn dim_atts() -> TextAtts {
+    TextAtts {
+        zoom: text_zoom(),
+        fg_fill: Fill::Closed(Color::RGB(150, 100, 150)),
+        bg_fill: Fill::None,
+        glyph_dim: glyph_dim(),
+        glyph_flow: glyph_flow(),
+    }
+}
+
+fn dim2_atts() -> TextAtts {
+    TextAtts {
+        zoom: text_zoom(),
+        fg_fill: Fill::Closed(Color::RGB(200, 180, 200)),
+        bg_fill: Fill::None,
+        glyph_dim: glyph_dim(),
+        glyph_flow: glyph_flow(),
+    }
+}
+
+fn data_atts() -> TextAtts {
+    TextAtts {
+        zoom: text_zoom(),
+        fg_fill: Fill::Closed(Color::RGB(230, 230, 230)),
+        bg_fill: Fill::None,
+        glyph_dim: glyph_dim(),
+        glyph_flow: glyph_flow(),
+    }
+}
+
+fn err_atts() -> TextAtts {
+    TextAtts {
+        zoom: text_zoom(),
+        fg_fill: Fill::Closed(Color::RGB(255, 100, 100)),
+        bg_fill: Fill::None,
+        glyph_dim: glyph_dim(),
+        glyph_flow: glyph_flow(),
+    }
+}
+
+fn msg_atts() -> TextAtts {
+    TextAtts {
+        zoom: text_zoom(),
+        fg_fill: Fill::Closed(Color::RGB(200, 200, 255)),
+        bg_fill: Fill::None,
+        glyph_dim: glyph_dim(),
+        glyph_flow: glyph_flow(),
+    }
+}
+
+fn big_msg_atts() -> TextAtts {
+    TextAtts {
+        zoom: text_zoom() * 2,
+        fg_fill: Fill::Closed(Color::RGB(220, 220, 255)),
+        bg_fill: Fill::Closed(Color::RGB(50, 50, 50)),
+        glyph_dim: glyph_dim(),
+        glyph_flow: glyph_flow(),
+    }
+}
+
+fn box_fill() -> Fill {
+    Fill::Open(Color::RGB(50, 100, 50), 1)
+}
+
+pub fn render_elms(repl: &Repl, r: &mut Render) {
     if repl.history.len() > 0 {
         r.begin(&Name::Void, FrameType::Flow(vert_flow()));
         r.str("Message log:", &msg_atts());
@@ -530,11 +753,32 @@ pub fn render_elms(repl: &Repl, r: &mut Render) {
                     r.text(&format!(" {:?}", &call.duration), &dim_atts());
                     r.str("━━►", &dim2_atts());
                     // to do -- if len of text overflows, then wrap it
-                    match call.rets_render {
+                    match call.render_out {
                         None => {
-                            r.text(rets_idl, &data_atts());
+                            if rets_idl.len() > 80 {
+                                let mut rets_idl = rets_idl.clone();
+                                rets_idl.truncate(80);
+                                r.text(&rets_idl, &data_atts());
+                                r.str("...", &data_atts())
+                            } else {
+                                r.text(rets_idl, &data_atts())
+                            }
                         }
-                        Some(ref elms) => r.add(elms.clone()),
+                        Some(ref out) => match out {
+                            render::Out::Draw(elm) => r.elm(elm.clone()),
+                            render::Out::Redraw(named_elms) => {
+                                for (name, elm) in named_elms.iter() {
+                                    r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+                                    r.fill(Fill::Open(Color::RGB(255, 255, 255), 1));
+                                    r.begin(&Name::Void, FrameType::Flow(horz_flow()));
+                                    r.name(name, &data_atts());
+                                    r.str("= ", &data_atts());
+                                    r.end();
+                                    r.elm(elm.clone());
+                                    r.end();
+                                }
+                            }
+                        },
                     };
                     r.end()
                 }

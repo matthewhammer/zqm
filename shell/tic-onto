@@ -1,0 +1,4 @@
+#!/bin/sh
+@echo Running $0
+echo Connecting to $1
+cargo run candid localhost:8000 ic:$1 ../mohammer/canisters/idl/$1.did

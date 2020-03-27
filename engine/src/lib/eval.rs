@@ -54,7 +54,11 @@ pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command
 
 use serde_idl::value::{IDLArgs, IDLField, IDLValue};
 
-pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> {
+pub fn command_eval(
+    state: &mut State,
+    orig_event: Option<Event>,
+    command: &Command,
+) -> Result<(), String> {
     if let &Command::Return(ref media) = command {
         debug!("command_eval: return...");
 
@@ -64,7 +68,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
             let old_top = state.frame.clone();
             state.frame = state.stack.pop().unwrap();
             let resume = Command::Resume(media.clone(), old_top);
-            command_eval(state, &resume)
+            command_eval(state, None, &resume)
         }
     } else if let &Command::Resume(Media::MenuTree(ref mt), ref old_frame) = command {
         // to do: clean, refactor and move this logic (e.g., into the candid module)
@@ -111,9 +115,15 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                                 let result =
                                     serde_idl::IDLArgs::from_bytes(&(*blob_res.unwrap().0));
                                 let idl_rets = result.unwrap().args;
-                                let rets_render = candid::render_of_rets(&idl_rets);
+                                let render_out = candid::find_render_out(&idl_rets);
                                 let res = format!("{:?}", &idl_rets);
-                                info!("..successful result {:?}", res);
+                                let mut res_log = res.clone();
+                                if res_log.len() > 80 {
+                                    res_log.truncate(80);
+                                    res_log.push_str("...(truncated)");
+                                }
+                                info!("..successful result {:?}", res_log);
+                                trace!("..render out {:?}", render_out);
                                 let call = candid::Call {
                                     timestamp: timestamp,
                                     duration: elapsed,
@@ -121,7 +131,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                                     args: tree.clone(),
                                     args_idl: str.to_string(),
                                     rets_idl: Ok(res),
-                                    rets_render,
+                                    render_out,
                                 };
                                 repl.history.push(call)
                             } else {
@@ -134,7 +144,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                                     args: tree.clone(),
                                     args_idl: str.to_string(),
                                     rets_idl: Err(res),
-                                    rets_render: None,
+                                    render_out: None,
                                 };
                                 repl.history.push(call)
                             }
@@ -153,7 +163,10 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
         Ok(())
     } else {
         debug!("command_eval {:?}", command);
-        info!("{:?}", command);
+        match orig_event {
+            Some(ev) => info!("event {:?} ==> command {:?}", ev, command),
+            None => info!("unknown event ==> command {:?}", command),
+        };
         let res = match (command, &mut state.frame.editor) {
             (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
                 super::bitmap::semantics::editor_eval(be, bc)
@@ -169,7 +182,7 @@ pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> 
                 match super::menu::semantics::editor_eval(e, c) {
                     Ok(()) => Ok(()),
                     Err(menu::Halt::Commit(mt)) => {
-                        command_eval(state, &Command::Return(Media::MenuTree(Box::new(mt))))
+                        command_eval(state, None, &Command::Return(Media::MenuTree(Box::new(mt))))
                     }
                     Err(menu::Halt::Message(m)) => Err(m),
                 }
