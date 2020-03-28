@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use bitmap;
 use glyph;
-use types::{
+pub use types::{
     lang::{Atom, Dir2D, Name},
-    render::{Dim, Elm, Elms, Fill, Node, Pos, Rect},
+    render::{Color, Dim, Elm, Elms, Fill, NamedElms, Node, Out, Pos, Rect},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]

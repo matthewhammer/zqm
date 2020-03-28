@@ -3,10 +3,8 @@ extern crate serde_idl;
 
 use menu;
 use menu::MenuType;
-use types::{
-    lang::{Atom, Name},
-    render,
-};
+use render;
+use types::lang::{Atom, Name};
 
 use ic_http_agent::{Agent, AgentConfig, Blob, CanisterId};
 use serde_idl::grammar::IDLProgParser;
@@ -101,17 +99,23 @@ pub fn string_of_field_id(id: u32) -> Option<String> {
     }
 }
 
-pub fn get_nat(n: &IDLValue) -> Option<usize> {
-    match n {
+pub fn get_nat(v: &IDLValue) -> Option<usize> {
+    match v {
         IDLValue::Nat(n) => Some(*n as usize),
-        _ => None,
+        _ => {
+            error!("expected nat: {:?}", v);
+            None
+        }
     }
 }
 
-pub fn get_text(n: &IDLValue) -> Option<String> {
-    match n {
+pub fn get_text(v: &IDLValue) -> Option<String> {
+    match v {
         IDLValue::Text(t) => Some(t.clone()),
-        _ => None,
+        _ => {
+            error!("expected text: {:?}", v);
+            None
+        }
     }
 }
 
@@ -188,31 +192,117 @@ pub fn get_color_nat(color_nat: &IDLValue) -> Option<(render::Color, usize)> {
     }
 }
 
-pub fn get_fill_(fill: &IDLField) -> Option<render::Fill> {
-    match fill.id {
+pub fn get_fill_(f: &IDLField) -> Option<render::Fill> {
+    match f.id {
         // #closed : Color
-        240232876 => match get_color(&fill.val) {
+        240232876 => match get_color(&f.val) {
             Some(c) => Some(Fill::Closed(c)),
             None => None,
         },
         // #open : (Color, Nat)
-        1236534218 => match get_color_nat(&fill.val) {
+        1236534218 => match get_color_nat(&f.val) {
             Some((c, n)) => Some(Fill::Open(c, n)),
             None => None,
         },
         // #none
         1225396920 => Some(Fill::None),
         _ => {
-            error!("unrecognized fill tag: {:?}", fill);
+            error!("unrecognized fill tag: {:?}", f);
             None
         }
     }
 }
 
-pub fn get_fill(fill: &IDLValue) -> Option<render::Fill> {
-    match fill {
+pub fn get_fill(v: &IDLValue) -> Option<render::Fill> {
+    match v {
         IDLValue::Variant(v) => get_fill_(&*v),
+        _ => {
+            error!("unrecognized fill: {:?}", v);
+            None
+        }
+    }
+}
+
+pub fn get_dir2d_(f: &IDLField) -> Option<Dir2D> {
+    match f.id {
+        3915647964 => Some(Dir2D::Right),
+        _ => {
+            error!("unrecognized dir2d tag: {:?}", f.id);
+            None
+        }
+    }
+}
+
+pub fn get_dir2d(v: &IDLValue) -> Option<Dir2D> {
+    match v {
+        IDLValue::Variant(v) => get_dir2d_(&*v),
+        _ => {
+            error!("unrecognized dir2d: {:?}", v);
+            None
+        }
+    }
+}
+
+pub fn get_flow_atts(v: &IDLValue) -> Option<render::FlowAtts> {
+    match v {
+        IDLValue::Record(fields) => {
+            if fields.len() != 3 {
+                return None;
+            };
+            match (
+                get_dir2d(&fields[0].val),
+                get_nat(&fields[1].val),
+                get_nat(&fields[2].val),
+            ) {
+                (Some(dir), Some(intra_pad), Some(inter_pad)) => Some(FlowAtts {
+                    dir,
+                    intra_pad,
+                    inter_pad,
+                }),
+                _ => {
+                    error!("unrecognized flow_atts: {:?}", v);
+                    None
+                }
+            }
+        }
         _ => None,
+    }
+}
+
+pub fn get_text_atts(v: &IDLValue) -> Option<render::TextAtts> {
+    match v {
+        IDLValue::Record(fields) => {
+            if fields.len() != 5 {
+                return None;
+            };
+            // to do -- fix these indices;
+            // get indicies from field names somehow.
+            match (
+                get_nat(&fields[1].val),
+                get_fill(&fields[0].val),
+                get_fill(&fields[3].val),
+                get_dim(&fields[4].val),
+                get_flow_atts(&fields[2].val),
+            ) {
+                (Some(zoom), Some(fg_fill), Some(bg_fill), Some(glyph_dim), Some(glyph_flow)) => {
+                    Some(TextAtts {
+                        zoom,
+                        fg_fill,
+                        bg_fill,
+                        glyph_dim,
+                        glyph_flow,
+                    })
+                }
+                _ => {
+                    error!("could not recognize text_atts {:?}", v);
+                    None
+                }
+            }
+        }
+        _ => {
+            error!("could not recognize text_atts {:?}", v);
+            None
+        }
     }
 }
 
@@ -223,10 +313,10 @@ pub fn get_render_text(elm: &IDLValue) -> Option<render::Elm> {
                 return None;
             };
             // to do -- decompose these text atts and use them!
-            match get_text(&fields[0].val) {
-                Some(t) => {
+            match (get_text(&fields[0].val), get_text_atts(&fields[1].val)) {
+                (Some(t), Some(ta)) => {
                     let mut r = Render::new();
-                    r.text(&t, &big_msg_atts());
+                    r.text(&t, &ta);
                     Some(r.into_elms()[0].clone())
                 }
                 _ => None,
