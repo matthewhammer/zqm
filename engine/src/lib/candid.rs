@@ -16,6 +16,7 @@ use serde_idl::{
     value::IDLValue,
 };
 
+
 use std::collections::HashMap;
 pub type Env = HashMap<String, MenuType>;
 
@@ -80,6 +81,10 @@ fn menutype_of_idltype(env: &Env, t: &IDLType) -> MenuType {
         IDLType::PrimT(PrimType::Text) => MenuType::Prim(menu::PrimType::Text),
         IDLType::PrimT(PrimType::Bool) => MenuType::Prim(menu::PrimType::Bool),
         IDLType::PrimT(PrimType::Null) => MenuType::Prim(menu::PrimType::Null),
+        IDLType::ServT(_) => {
+            // To do (!):
+            MenuType::Prim(menu::PrimType::Null)
+        }
         _ => unimplemented!("{:?}", t),
     }
 }

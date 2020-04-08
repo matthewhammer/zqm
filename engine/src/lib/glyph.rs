@@ -22,10 +22,17 @@ pub mod cap5x5 {
     // the first set of glyphs to bootstrap zqm's interface
     // editor: emacs (Rust major mode, in ovewrite minor mode)
     glyph_map! {
-        "☺" => [
+        "☺2" => [
             0 8 8 8 0 ;
             8 0 0 0 8 ;
             8 0 0 0 8 ;
+            8 0 0 0 8 ;
+            0 8 8 8 0
+        ],
+        "☺" => [
+            0 8 8 8 0 ;
+            8 0 8 0 8 ;
+            0 8 8 8 0 ;
             8 0 0 0 8 ;
             0 8 8 8 0
         ],
