@@ -256,8 +256,8 @@ pub fn get_flow_atts(v: &IDLValue) -> Option<render::FlowAtts> {
             };
             match (
                 get_dir2d(&fields[0].val),
-                get_nat(&fields[1].val),
                 get_nat(&fields[2].val),
+                get_nat(&fields[1].val),
             ) {
                 (Some(dir), Some(intra_pad), Some(inter_pad)) => Some(FlowAtts {
                     dir,
