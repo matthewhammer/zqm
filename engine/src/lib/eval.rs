@@ -4,6 +4,12 @@ use bitmap;
 use candid;
 use menu;
 
+use delay::Delay;
+use std::time::Duration;
+
+const RETRY_PAUSE: Duration = Duration::from_millis(100);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+
 pub enum LoadState {
     CandidFile { file: String },
     Resume,
@@ -85,7 +91,7 @@ pub fn command_eval(
                         debug!("...as {}({})", method, args);
 
                         if let &mut Editor::CandidRepl(ref mut repl) = &mut state.frame.editor {
-                            use ic_http_agent::{Blob, CanisterId, Waiter};
+                            use ic_agent::{Blob, CanisterId};
                             use std::time::Duration;
                             use tokio::runtime::Runtime;
 
@@ -95,9 +101,9 @@ pub fn command_eval(
                             );
 
                             let mut runtime = Runtime::new().expect("Unable to create a runtime");
-                            let waiter = Waiter::builder()
-                                .throttle(Duration::from_millis(100))
-                                .timeout(Duration::from_secs(60))
+                            let delay = Delay::builder()
+                                .throttle(RETRY_PAUSE)
+                                .timeout(REQUEST_TIMEOUT)
                                 .build();
                             let agent = candid::agent(&repl.config.replica_url).unwrap();
                             let canister_id =
@@ -107,7 +113,7 @@ pub fn command_eval(
                                 &canister_id,
                                 &method,
                                 &Blob(args.to_bytes().unwrap()),
-                                waiter,
+                                delay,
                             ));
 
                             let elapsed = timestamp.elapsed().unwrap();

@@ -6,7 +6,7 @@ use menu::MenuType;
 use render;
 use types::lang::{Atom, Name};
 
-use ic_http_agent::{Agent, AgentConfig, Blob, CanisterId};
+use ic_agent::{Agent, AgentConfig, Blob, CanisterId};
 use serde_idl::grammar::IDLProgParser;
 use serde_idl::lexer::Lexer;
 use serde_idl::{
@@ -645,7 +645,7 @@ pub fn menutype_of_idlprog(p: &IDLProg) -> menu::MenuType {
     }
 }
 
-pub fn agent(url: &str) -> Result<Agent, ic_http_agent::AgentError> {
+pub fn agent(url: &str) -> Result<Agent, ic_agent::AgentError> {
     Agent::new(AgentConfig {
         url: format!("http://{}", url).as_str(),
         ..AgentConfig::default()
