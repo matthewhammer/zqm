@@ -15,13 +15,14 @@ extern crate structopt;
 use structopt::StructOpt;
 
 use sdl2::event::Event as SysEvent;
+use sdl2::event::WindowEvent;
 use sdl2::keyboard::Keycode;
 use std::io;
 
 // ZQM:
 extern crate zqm_engine;
 use zqm_engine::{
-    eval,
+    candid, eval, init,
     types::{self, event, render},
 };
 
@@ -44,20 +45,18 @@ struct CliOpt {
 
 #[derive(StructOpt, Debug)]
 enum CliCommand {
+    #[structopt(name = "candid", about = "Start an interactive Candid session.")]
+    Candid {
+        replica_url: String,
+        canister_id: String,
+        did_file: String,
+    },
+
     #[structopt(name = "start", about = "Start interactively.")]
     Start,
 
     #[structopt(name = "resume", about = "Resume last interaction.")]
     Resume,
-
-    #[structopt(name = "replay", about = "Replay last interaction.")]
-    Replay,
-
-    #[structopt(
-        name = "history",
-        about = "Interact with history, the list of all prior interactions."
-    )]
-    History,
 
     #[structopt(name = "version", about = "Display version.")]
     Version,
@@ -157,6 +156,16 @@ pub fn draw_elms<T: RenderTarget>(
 
 fn translate_system_event(event: SysEvent) -> Option<event::Event> {
     match &event {
+        SysEvent::Window {
+            win_event: WindowEvent::SizeChanged(w, h),
+            ..
+        } => {
+            let dim = render::Dim {
+                width: *w as usize,
+                height: *h as usize,
+            };
+            Some(event::Event::WindowSizeChange(dim))
+        }
         SysEvent::Quit { .. }
         | SysEvent::KeyDown {
             keycode: Some(Keycode::Escape),
@@ -191,22 +200,32 @@ fn translate_system_event(event: SysEvent) -> Option<event::Event> {
     }
 }
 
+pub fn redraw<T: RenderTarget>(
+    canvas: &mut Canvas<T>,
+    state: &mut types::lang::State,
+    dim: &render::Dim,
+) -> Result<(), String> {
+    let pos = render::Pos { x: 0, y: 0 };
+    let fill = render::Fill::Closed(render::Color::RGB(0, 0, 0));
+    let elms = eval::render_elms(state)?;
+    draw_elms(canvas, &pos, dim, &fill, &elms)?;
+    canvas.present();
+    drop(elms);
+    Ok(())
+}
+
 pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
     use sdl2::event::EventType;
-
-    let pos = render::Pos { x: 0, y: 0 };
-    let dim = render::Dim {
-        width: 888,
+    let mut dim = render::Dim {
+        width: 1000,
         height: 666,
     };
-    let fill = render::Fill::Closed(render::Color::RGB(0, 0, 0));
-
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let window = video_subsystem
-        .window("zoom-quilt-machine", dim.width as u32, dim.height as u32)
+        .window("thin-ic-agent", dim.width as u32, dim.height as u32)
         .position_centered()
-        //.resizable()
+        .resizable()
         //.input_grabbed()
         //.fullscreen()
         //.fullscreen_desktop()
@@ -223,10 +242,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
 
     {
         // draw initial frame, before waiting for any events
-        let elms = eval::render_elms(state)?;
-        draw_elms(&mut canvas, &pos, &dim, &fill, &elms)?;
-        canvas.present();
-        drop(elms);
+        redraw(&mut canvas, state, &dim);
     }
 
     let mut event_pump = sdl_context.event_pump()?;
@@ -242,12 +258,22 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
             None => continue 'running,
             Some(event) => event,
         };
+        // catch window resize event: redraw and loop:
+        match event {
+            event::Event::WindowSizeChange(new_dim) => {
+                dim = new_dim.clone();
+                redraw(&mut canvas, state, &dim)?;
+                continue 'running;
+            }
+            _ => (),
+        }
         match eval::commands_of_event(state, &event) {
             Ok(commands) => {
                 for c in commands.iter() {
                     // note: we borrow the command here, possibly requiring some cloning when it is evaluated.
                     // todo -- we do nothing with the result; we should log it.
-                    match eval::command_eval(state, c) {
+                    let event = event.clone();
+                    match eval::command_eval(state, Some(event), c) {
                         Ok(()) => {}
                         Err(msg) => {
                             warn!("Command {:?} lead to an error:", c);
@@ -255,10 +281,7 @@ pub fn do_event_loop(state: &mut types::lang::State) -> Result<(), String> {
                         }
                     }
                 }
-                let elms = eval::render_elms(state)?;
-                draw_elms(&mut canvas, &pos, &dim, &fill, &elms)?;
-                canvas.present();
-                drop(elms);
+                redraw(&mut canvas, state, &dim)?;
             }
             Err(()) => break 'running,
         }
@@ -276,12 +299,32 @@ fn main() {
             (_, _, _) => log::LevelFilter::Info,
         },
     );
-
-    let mut state = eval::load_state();
-
     info!("Evaluating CLI command: {:?} ...", &cliopt.command);
-
+    // - - - - - - - - - - -
     match cliopt.command {
+        CliCommand::Candid {
+            replica_url,
+            canister_id,
+            did_file,
+        } => {
+            use std::fs;
+            let contents = fs::read_to_string(&did_file).expect("reading candid file");
+            let ast = candid::parse_idl(&contents);
+            //let menu = candid::menutype_of_idlprog_service(&ast);
+            let mut state = candid::init(replica_url.as_str(), canister_id.as_str(), &ast).unwrap();
+            do_event_loop(&mut state).unwrap();
+            eval::save_state(&state);
+        }
+        CliCommand::Start => {
+            let mut state = init::init_state();
+            do_event_loop(&mut state).unwrap();
+            eval::save_state(&state);
+        }
+        CliCommand::Resume => {
+            let mut state = eval::load_state();
+            do_event_loop(&mut state).unwrap();
+            eval::save_state(&state);
+        }
         CliCommand::Version => {
             const VERSION: &'static str = env!("CARGO_PKG_VERSION");
             println!("{}", VERSION);
@@ -292,15 +335,5 @@ fn main() {
             CliOpt::clap().gen_completions_to("zqm", s, &mut io::stdout());
             info!("done")
         }
-        CliCommand::Start => {
-            do_event_loop(&mut state).unwrap();
-            eval::save_state(&state);
-        }
-        CliCommand::Resume => {
-            do_event_loop(&mut state).unwrap();
-            eval::save_state(&state);
-        }
-        CliCommand::Replay => unimplemented!(),
-        CliCommand::History => unimplemented!(),
     }
 }

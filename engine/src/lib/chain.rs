@@ -131,7 +131,7 @@ pub struct EditorState {
     pub tail: Chain,
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Editor {
     pub history: Vec<Command>,
     pub state: Option<EditorState>,

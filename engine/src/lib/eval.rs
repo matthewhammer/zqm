@@ -1,17 +1,30 @@
 // to-do/question: rename this module to 'engine'?
 
 use bitmap;
+use candid;
 use menu;
+
+use delay::Delay;
+use std::time::Duration;
+
+const RETRY_PAUSE: Duration = Duration::from_millis(100);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+
+pub enum LoadState {
+    CandidFile { file: String },
+    Resume,
+}
 
 pub use super::types::{
     event::Event,
-    lang::{Command, Editor, State},
+    lang::{Command, Editor, Media, State},
     render,
 };
 
 pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command>, ()> {
     debug!("commands_of_event {:?}", event);
-    let res = match &mut state.editor {
+    let res = match &mut state.frame.editor {
+        &mut Editor::CandidRepl(ref _repl) => unimplemented!(),
         &mut Editor::Bitmap(ref _ed) => {
             // to do -- insert a name into each command that is unique,
             // but whose structure encodes a wallclock timestamp, among other sequence numbers.
@@ -45,43 +58,202 @@ pub fn commands_of_event(state: &mut State, event: &Event) -> Result<Vec<Command
     res
 }
 
-pub fn command_eval(state: &mut State, command: &Command) -> Result<(), String> {
-    debug!("command_eval {:?}", command);
-    let res = match (command, &mut state.editor) {
-        (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
-            super::bitmap::semantics::editor_eval(be, bc)
-        }
-        (&Command::Bitmap(ref _bc), _) => Err("bitmap editor expected bitmap command".to_string()),
-        (_, &mut Editor::Bitmap(ref mut _be)) => {
-            Err("bitmap command for non-bitmap editor".to_string())
-        }
+use serde_idl::value::{IDLArgs, IDLField, IDLValue};
 
-        (&Command::Menu(ref c), &mut Editor::Menu(ref mut e)) => {
-            super::menu::semantics::editor_eval(e, c)
-        }
-        (&Command::Menu(ref _c), _) => Err("menu editor expected menu command".to_string()),
-        (_, &mut Editor::Menu(ref mut _e)) => Err("menu command for non-menu editor".to_string()),
+pub fn command_eval(
+    state: &mut State,
+    orig_event: Option<Event>,
+    command: &Command,
+) -> Result<(), String> {
+    if let &Command::Return(ref media) = command {
+        debug!("command_eval: return...");
 
-        (&Command::Chain(ref _ch), _) => unimplemented!(),
-        (&Command::Grid(ref _gr), _) => unimplemented!(),
-    };
-    debug!("command_eval {:?} ==> {:?}", command, res);
-    res
+        if state.stack.len() == 0 {
+            Err(format!("cannot return; empty stack"))
+        } else {
+            let old_top = state.frame.clone();
+            state.frame = state.stack.pop().unwrap();
+            let resume = Command::Resume(media.clone(), old_top);
+            command_eval(state, None, &resume)
+        }
+    } else if let &Command::Resume(Media::MenuTree(ref mt), ref old_frame) = command {
+        // to do: clean, refactor and move this logic (e.g., into the candid module)
+        match &**mt {
+            &menu::MenuTree::Variant(ref ch) => match &ch.choice {
+                None => {
+                    warn!("no choice selected; try again...");
+                }
+                &Some((ref lab, ref tree, ref typ)) => {
+                    let method = format!("{}", lab);
+                    let str = format!("{}", tree);
+                    info!("Sending message \"{}\", with args {}", method, str);
+                    if let Ok(args) = &str.parse::<IDLArgs>() {
+                        debug!("...as {}({})", method, args);
+
+                        if let &mut Editor::CandidRepl(ref mut repl) = &mut state.frame.editor {
+                            use ic_agent::{Blob, CanisterId};
+                            use std::time::Duration;
+                            use tokio::runtime::Runtime;
+
+                            info!(
+                                "...to canister_id {:?} at replica_url {:?}",
+                                repl.config.canister_id, repl.config.replica_url
+                            );
+
+                            let mut runtime = Runtime::new().expect("Unable to create a runtime");
+                            let delay = Delay::builder()
+                                .throttle(RETRY_PAUSE)
+                                .timeout(REQUEST_TIMEOUT)
+                                .build();
+                            let agent = candid::agent(&repl.config.replica_url).unwrap();
+                            let canister_id =
+                                CanisterId::from_text(repl.config.canister_id.clone()).unwrap();
+                            let timestamp = std::time::SystemTime::now();
+                            let blob_res = runtime.block_on(agent.call_and_wait(
+                                &canister_id,
+                                &method,
+                                &Blob(args.to_bytes().unwrap()),
+                                delay,
+                            ));
+
+                            let elapsed = timestamp.elapsed().unwrap();
+                            if let Ok(blob_res) = blob_res {
+                                let result =
+                                    serde_idl::IDLArgs::from_bytes(&(*blob_res.unwrap().0));
+                                let idl_rets = result.unwrap().args;
+                                let render_out = candid::find_render_out(&idl_rets);
+                                repl.update_display(&render_out);
+                                let res = format!("{:?}", &idl_rets);
+                                let mut res_log = res.clone();
+                                if res_log.len() > 80 {
+                                    res_log.truncate(80);
+                                    res_log.push_str("...(truncated)");
+                                }
+                                info!("..successful result {:?}", res_log);
+                                trace!("..render out {:?}", render_out);
+                                let call = candid::Call {
+                                    timestamp: timestamp,
+                                    duration: elapsed,
+                                    method: method,
+                                    args: tree.clone(),
+                                    args_idl: str.to_string(),
+                                    rets_idl: Ok(res),
+                                    render_out,
+                                };
+                                repl.history.push(call)
+                            } else {
+                                let res = format!("{:?}", blob_res);
+                                info!("..error result {:?}", res);
+                                let call = candid::Call {
+                                    timestamp: timestamp,
+                                    duration: elapsed,
+                                    method: method,
+                                    args: tree.clone(),
+                                    args_idl: str.to_string(),
+                                    rets_idl: Err(res),
+                                    render_out: None,
+                                };
+                                repl.history.push(call)
+                            }
+                        } else {
+                            unreachable!()
+                        }
+                    } else {
+                        error!("Cannot send incomplete message; please fill remaining blanks.")
+                    }
+                }
+            },
+            _ => unreachable!("broken invariants"),
+        }
+        state.stack.push(state.frame.clone());
+        state.frame = old_frame.clone();
+        Ok(())
+    } else {
+        debug!("command_eval {:?}", command);
+        match orig_event {
+            Some(ev) => info!("event {:?} ==> command {:?}", ev, command),
+            None => info!("unknown event ==> command {:?}", command),
+        };
+        let res = match (command, &mut state.frame.editor) {
+            (&Command::Bitmap(ref bc), &mut Editor::Bitmap(ref mut be)) => {
+                super::bitmap::semantics::editor_eval(be, bc)
+            }
+            (&Command::Bitmap(ref _bc), _) => {
+                Err("bitmap editor expected bitmap command".to_string())
+            }
+            (_, &mut Editor::Bitmap(ref mut _be)) => {
+                Err("bitmap command for non-bitmap editor".to_string())
+            }
+
+            (&Command::Menu(ref c), &mut Editor::Menu(ref mut e)) => {
+                match super::menu::semantics::editor_eval(e, c) {
+                    Ok(()) => Ok(()),
+                    Err(menu::Halt::Commit(mt)) => {
+                        command_eval(state, None, &Command::Return(Media::MenuTree(Box::new(mt))))
+                    }
+                    Err(menu::Halt::Message(m)) => Err(m),
+                }
+            }
+            (&Command::Menu(ref _c), _) => Err("menu editor expected menu command".to_string()),
+            (_, &mut Editor::Menu(ref mut _e)) => {
+                Err("menu command for non-menu editor".to_string())
+            }
+
+            (&Command::Chain(ref _ch), _) => unimplemented!(),
+            (&Command::Grid(ref _gr), _) => unimplemented!(),
+            (&Command::Return(_), _) => unimplemented!(),
+            (&Command::Resume(_, _), _) => unimplemented!(),
+        };
+        debug!("command_eval {:?} ==> {:?}", command, res);
+        res
+    }
 }
 
-pub fn render_elms(state: &State) -> Result<render::Elms, String> {
-    match &state.editor {
+use crate::render::{FlowAtts, FrameType, Render, TextAtts};
+use types::lang::{Dir2D, Name};
+
+pub fn render_elms_of_editor(editor: &Editor, r: &mut Render) {
+    match editor {
+        &Editor::CandidRepl(ref repl) => candid::render_elms(repl, r),
         &Editor::Bitmap(ref ed) => match ed.state {
-            None => Ok(vec![]),
-            Some(ref ed) => super::bitmap::io::render_elms(ed),
+            None => warn!("to do: render empty bitmap editor?"),
+            Some(ref ed) => unimplemented!(), //super::bitmap::io::render_elms(ed, r),
         },
         &Editor::Menu(ref ed) => match ed.state {
-            None => Ok(vec![]),
-            Some(ref st) => super::menu::io::render_elms(st),
+            None => warn!("to do: render empty bitmap editor?"),
+            Some(ref st) => menu::io::render_elms(st, r),
         },
         &Editor::Chain(ref _ch) => unimplemented!(),
         &Editor::Grid(ref _gr) => unimplemented!(),
     }
+}
+
+pub fn render_elms(state: &State) -> Result<render::Elms, String> {
+    let mut r = Render::new();
+    fn vert_flow() -> FlowAtts {
+        FlowAtts {
+            dir: Dir2D::Down,
+            intra_pad: 2,
+            inter_pad: 2,
+        }
+    }
+    fn horz_flow() -> FlowAtts {
+        FlowAtts {
+            dir: Dir2D::Right,
+            intra_pad: 2,
+            inter_pad: 2,
+        }
+    }
+    // to do: acquire and use the screen dimension for "clip flows".
+    r.begin(&Name::Void, FrameType::Flow(horz_flow()));
+    r.begin(&Name::Void, FrameType::Flow(vert_flow()));
+    for frame in state.stack.iter() {
+        render_elms_of_editor(&frame.editor, &mut r);
+    }
+    r.end();
+    render_elms_of_editor(&state.frame.editor, &mut r);
+    r.end();
+    Ok(r.into_elms())
 }
 
 pub fn get_persis_state_path() -> String {

@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use bitmap;
 use glyph;
-use types::{
+pub use types::{
     lang::{Atom, Dir2D, Name},
-    render::{Dim, Elm, Elms, Fill, Node, Pos, Rect},
+    render::{Color, Dim, Elm, Elms, Fill, NamedElms, Node, Out, Pos, Rect},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
@@ -99,6 +99,10 @@ impl Render {
         self.frame.elms.push(Elm::Rect(r.clone(), f))
     }
 
+    pub fn elm(&mut self, e: Elm) {
+        self.frame.elms.push(e)
+    }
+
     pub fn bitmap(&mut self, bm: &bitmap::Bitmap, ba: &BitmapAtts) {
         let (width, height) = bitmap::semantics::bitmap_get_size(bm);
         for y in 0..height {
@@ -158,6 +162,11 @@ impl Render {
             self.end()
         }
         self.end();
+    }
+
+    pub fn add(&mut self, elms: Elms) {
+        let mut elms = elms;
+        self.frame.elms.append(&mut elms)
     }
 
     pub fn into_elms(self) -> Elms {

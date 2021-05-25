@@ -7,7 +7,11 @@ extern crate hashcons;
 extern crate serde;
 extern crate serde_bytes;
 
-// -------- eval semantics ---------
+extern crate ic_agent;
+extern crate serde_idl;
+
+extern crate tokio;
+extern crate delay;
 
 pub mod eval;
 pub mod init;
@@ -34,3 +38,7 @@ pub type GlyphMap = std::collections::HashMap<types::lang::Name, Glyph>;
 
 pub mod glyph;
 pub mod render;
+
+// -------- Candid (IC input/output) ---------
+
+pub mod candid;

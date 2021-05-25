@@ -1,17 +1,52 @@
-use eval;
+extern crate serde_idl;
+
+use candid;
 use menu;
-use types::lang::{Atom, Command, Editor, Name, State};
+
+use eval;
+use types::lang::{Atom, Command, Editor, Frame, FrameCont, Name, State};
 
 pub fn init_state() -> State {
     let (mut state_init, init_command) = {
-        if false {
+        if true {
+            let idl_spec = r#"
+service server : {
+  f : (a: nat, b:nat) -> () oneway;
+  g : (a: text, b:nat) -> () oneway;
+  h : (a: nat, b:record { nat; nat; record { nat; 0x2a:nat; nat8; }; 42:nat; 40:nat; variant{ A; 0x2a; B; C }; }) -> () oneway;
+}
+    "#;
+            let idlprog = candid::parse_idl(&idl_spec);
+            let menu_type = candid::menutype_of_idlprog(&idlprog);
+            (
+                State {
+                    stack: vec![],
+                    frame: Frame::from_editor(Editor::Menu(Box::new(menu::Editor {
+                        state: None,
+                        history: vec![],
+                    }))),
+                },
+                Command::Menu(menu::Command::Init(menu::InitCommand::Default(
+                    menu::MenuTree::Blank(menu_type.clone()),
+                    menu_type,
+                ))),
+            )
+        } else if false {
             use crate::bitmap;
             (
                 State {
-                    editor: Editor::Bitmap(Box::new(bitmap::Editor {
-                        state: None,
-                        history: vec![],
-                    })),
+                    stack: vec![],
+                    frame: Frame {
+                        name: Name::Void,
+                        editor: Editor::Bitmap(Box::new(bitmap::Editor {
+                            state: None,
+                            history: vec![],
+                        })),
+                        cont: FrameCont {
+                            var: Name::Void,
+                            commands: vec![],
+                        },
+                    },
                 },
                 Command::Bitmap(bitmap::Command::Init(bitmap::InitCommand::Make16x16)),
             )
@@ -79,10 +114,11 @@ pub fn init_state() -> State {
             ]);
             (
                 State {
-                    editor: Editor::Menu(Box::new(menu::Editor {
+                    stack: vec![],
+                    frame: Frame::from_editor(Editor::Menu(Box::new(menu::Editor {
                         state: None,
                         history: vec![],
-                    })),
+                    }))),
                 },
                 Command::Menu(menu::Command::Init(menu::InitCommand::Default(
                     menu::MenuTree::Blank(root.clone()),
@@ -91,7 +127,7 @@ pub fn init_state() -> State {
             )
         }
     };
-    let r = eval::command_eval(&mut state_init, &init_command);
+    let r = eval::command_eval(&mut state_init, None, &init_command);
     match r {
         Ok(()) => {}
         Err(err) => eprintln!("Failed to initialize the editor: {:?}", err),
